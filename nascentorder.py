@@ -335,9 +335,9 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
                         s.data = loc
                     else:
                         s.is_pointer = False
-                        slen = bytes_to_int(data[loc:loc+2])
-                        if data[loc+slen-1] == '\xF6': slen = slen + 2
-                        if data[loc+slen-2] == '\xF6': slen = slen + 1
+                        slen = bytes_to_int(data[loc:loc+2]) + 2
+                        #if data[loc+slen-1] == '\xF6': slen = slen + 2
+                        #if data[loc+slen-2] == '\xF6': slen = slen + 1
                         s.data = data[loc:loc+slen]
                     loc = isetlocs[0] + sid * isetsize
                     assert loc + isetsize <= isetlocs[1] + 1
