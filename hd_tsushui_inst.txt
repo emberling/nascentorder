@@ -1,0 +1,3 @@
+# pointer locations to load if tsushiy instrument patch is detected
+[MusicPtr]
+brrpointers: 53C5F, 53DF3

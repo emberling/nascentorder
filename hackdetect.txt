@@ -1,0 +1,9 @@
+# config detection of known hacks
+# format:
+# identifier: 98765, xx, xx, xx, xx, xx
+# first parameter is a hex offset
+# second parameter is expected data (as hex bytes) to find at that offset
+# if the data matches, config file "hd_identifier.txt" is loaded
+
+[HackDetection]
+tsushiy_inst: 31000B, 2A, AA, E2, C0, FB, E4

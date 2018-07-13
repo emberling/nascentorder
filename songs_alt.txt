@@ -1,0 +1,101 @@
+# alternate song list
+# activate with ALTSONGLIST in modestring
+# You can use this one for importing to your project, testing new songs, etc
+# while leaving the other one set for rando gameplay
+
+[Imports]
+#custom songs   
+#filename: slotname(s)
+#e.g., "ff7_aerith: boss" will give you that Jenova*LIFE feeling every time
+#in MUSICCHAOS mode you just need to put the filenames (and I/G ratings if using battle progression)
+#e.g., "ff7_aerith:"
+#if you leave off the colon it will crash.
+
+ct_boss2:
+
+[SongSlots]
+#song id: identifier, % chance to allow change
+00: sfxsilence, 0
+01: prelude,    0
+02: omen1,      0
+03: omen2,      0
+04: omen3,      0
+05: awakening,  100
+06: balance,    100
+07: shadow,     100
+08: strago,     100
+09: gau,        100
+0A: figaro,     100
+0B: coin,       100
+0C: cyan,       100
+0D: locke,      100
+0E: rachel,     100
+0F: relm,       100
+10: setzer,     100
+11: daryl,      100
+12: celes,      100
+13: chocobo,     25
+14: boss,       100
+15: johnny,     100
+16: kefka,      100
+17: narshe,     100
+18: forest,     100
+19: veldt,      100
+1A: savethem,   100
+1B: gestahl,    100
+1C: troops,     100
+1D: martiallaw, 100
+1E: sfxwater,   0
+1F: metamorphosis,100
+20: train,      100
+21: espers,     100
+22: grandfinale, 33
+23: mountain,   100
+24: battle,     100
+25: fanfareslow,0
+26: wed_dance,  0
+27: aria,       0
+28: serpent,    100    
+29: zozo,       100
+2A: town,       100
+2B: what,       100
+2C: sfxcrowd,   0
+2D: gogo,       100
+2E: returners,  100
+2F: fanfare,    0
+30: umaro,      100
+31: moogles,    100
+32: unforgiven, 100
+33: atma,       100
+34: town_ruin,  100
+35: blackjack,  100
+36: catastrophe,0
+37: owzer,      100
+38: sleep,      0
+39: sfxwind,    0    
+3A: sfxwaves,   0
+3B: dmad123,    0
+3C: sfxtrain,   0
+3D: spinachrag, 100
+3E: death,      0
+3F: sfxchocobo, 0
+40: sfxrain,    0
+41: opera_intro,0
+42: opera_draco,0
+43: opera_overture,0
+44: wed_attack, 0
+45: wed_duel,   0
+46: wed_rafters,0
+47: magitek,    100
+48: sfxespers,  0
+49: sfxcranes,  0
+4A: sfxfire,    0
+4B: floatingcont,100
+4C: falcon,     100
+4D: fanatics,   100
+4E: kefkastower,100
+4F: ruin,       100
+50: dmad5,      0
+52: dmad4,      0
+53: ending1,    0    
+54: ending2,    0

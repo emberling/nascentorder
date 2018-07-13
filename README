@@ -1,0 +1,81 @@
+Nascent Order for Final Fantasy VI
+a supplemental randomizer by emberling
+version 0.0.2a   (alpha -- expect brokenness)
+
+The main goal of this project is to build on top of FF6 Beyond Chaos to create
+the randomized experience that most appeals to me. I'm fascinated by randomly
+generated art pieces and story projects, things like @MagicRealismBot and
+botnik.org. I'm not looking to challenge myself (gameplay wise) or to spark
+hilarious moments on twitch dot teevee so much as I'm looking to create
+fresh experiences that would be believable as alternate-universe versions
+of FF6.
+
+NaO is designed specifically for use with a ROM already run through Beyond
+Chaos, but it is also designed to be highly flexible and to work with any
+hacked ROM you give it! Some may require some reconfiguration, though, and
+there are many permutations I haven't yet coded in. But in general, while
+it's not the main intent of this program, it CAN be used as a tool to
+insert and repack music for your non-random hack, for instance.
+
+My rewrites and mods, and the modules contained herein, are
+generally built around the idea of *curated* randomness. Fire can be
+red, or yellow, or orange, or even blue, but not green. Grandpa can be
+a knight or a ninja or a mime, but not a child.
+
+Or you can turn that off, if you'd rather. I'm not picky about what YOU do.
+
+Many of the Beyond Chaos systems are based around taking existing FF6 systems
+-- palettes, spells, items, enemy AI -- in new, surprising, and incongruous
+directions. My reimaginings generally flip this around, building those things from
+scratch while trying to avoid incongruity as much as possible, relying on the
+inevitable ineptitude of machine generation to produce those surprising
+moments. BC's methods work great for streaming and community, and for
+people always seeking new challenges. But I like different things than that,
+personally, so here we are.
+
+So far, NaO does these things:
+    - Music randomizer
+        - imports external music from data files (included)
+        - shuffles music appropriately (or inappropriately, if desired)
+        - adds four additional battle songs
+        - assigns battle and boss music roughly based on difficulty (enemy level)
+
+On the horizon / works currently in progress:
+    - Character palette rework
+        Should be both more vivid and more consistent/less glitchy than BC.
+        Includes skintone randomization from a curated list of possibilities
+        Will include repalettings of a few problematic default sprites, if present
+        Figaro twins match; The General uses the same palette in or out of chains.
+    - Pixelated portrait mode
+        If activated, generates portraits based on the top 16x16 of battle "ready" sprite.
+        This matches the character's palette.
+        Bottom 16x16 used if top 16x16 is empty.
+        Possible to replace all portraits or to only replace stock FF6 portraits applied
+        to sprites other than their original sprite.
+    - Assign battle music tiers based on location
+    - Many more song imports to come
+
+Future plans:
+    - Save last used modes as default; allow setting a few quick-select mode sets
+    - Automatically import Tsushiy instrument patch for better sounding music
+    - Incorporate various improvement patches to character abilities
+        (rage, dance, swdtech, runic/retort)
+    - Full sprite randomization/import as in BC, with more constraints available
+    - Script edits to reflect random characters' gender and some other things
+    - Could it be that "Rage" is the key to winning this war?
+        The Empire is really interested in The Witch for some reason.
+        It should reflect an ability she actually has!
+    - General de-trolling, changing things that randomly flat-out kill you into
+      things that are dangerous, but avoidable without such drastic measures as
+      "don't open chests" or "don't cast spells on enemies" or "don't ever use
+      my cool nuke ability unless I'm going to die anyway."
+
+Other stuff I'm experimenting with, tentatively:
+    - Item rework to be more varied and more casual friendly than BC
+        (fewer evade penalties, more variety in types and bonuses)
+    - Random spells and effects, if I can make it work
+    
+    I may also try to port my constraints-based spell palette mod from
+    my v63 BC edit, but I never really finished it, and the full random
+    spells mode would obsolete it IF I manage to get that off the ground.
+    
