@@ -41,7 +41,7 @@ Song conversions:
                  ffmq_gale
                  iog_boss
                  lu1_boss
-                 lu2_battle, lu2_boss, lu2_map*, lu2_mountain
+                 lu2_boss, lu2_map*, lu2_mountain
                  met3_brain
                  sd2_fortress, sd2_pureland, sd2_thick
                  sd3_paths
@@ -50,6 +50,7 @@ Song conversions:
                  xg_chuchu, xg_mermaid
                  zaol_overworld
                  zoot_storms
+    Jackimus -- lu2_battle*
     MetroidQuest -- ff4_baron, ff4_boss*, ff4_cave
                     ff5_bridge
     Royaken -- ff4_bomb*, ff4_mysidia, ff4_whale*
