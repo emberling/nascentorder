@@ -1,13 +1,15 @@
-VERSION = "0.0.2a"
+VERSION = "0.1.0 dev"
 DEBUG = True
 import sys, traceback, ConfigParser, random, time, os.path, operator
 from copy import copy
+from string import maketrans
 
 HIROM = 0xC00000
 CONFIG_DEFAULTS = {
         'modes': 'm',
         'skip_hack_detection': 'False',
         'allow_music_repeats': 'False',
+        'field_music_chance': '0',
         'preserve_song_data': 'False',
         'battle_music_lookup': 'battle1, boss1, boss2, battle2, battle3, 3B, battle4, battle5',
         'battle_music_ids': '24, new, new, new, new',
@@ -95,8 +97,9 @@ def printspoiler(f, seed):
         line(separator)
         for t in spoiler['Debug']:
             line(t)
-    
+
 def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglist):
+    print "** Processing random music ..." if f_randomize else "** Processing custom music ..."
     f_repeat = CONFIG.getboolean('Music', 'allow_music_repeats')
     f_preserve = CONFIG.getboolean('Music', 'preserve_song_data')
     isetlocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'instruments').split(',')]
@@ -272,8 +275,6 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
                     s.changeto = changeto
                     used_songs.append(changeto)
 
-        #print "battleids {} bossids {}".format(battleids, bossids)
-        #print "battleprog {} bossprog {}".format(battleprog, bossprog)
         return (battleids, bossids)
     
     def check_ids_fit():
@@ -425,7 +426,7 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         space = [e - b for b, e in songdatalocs]
         songdata = [""] * len(space)
         songinst = data[isetlocs[0]:isetlocs[1]+1]    
-        dprint("free space for music: {}".format(space))
+        dprint("    free space for music: {}".format(space))
         for ident, s in songtable.items():
             #dprint("attempting to insert {} in slot {} ({})".format(s.changeto, s.id, ident))
             for i, l in enumerate(songdatalocs):
@@ -524,6 +525,7 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
     return data
     
 def process_formation_music(data, f_shufflefield):
+    print "** Processing progressive battle music ..."
     isetlocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'instruments').split(',')]
     if len(isetlocs) != 2: isetlocs = to_default('instruments')
     songdatalocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'songdata').split(',')]
@@ -596,7 +598,9 @@ def process_formation_music(data, f_shufflefield):
             else: song = 0
             byte = (byte & 0b10001111) | (song << 4)
             if f_shufflefield:
-                if rng.randint(0,5):
+                fieldchance = int(CONFIG.get('Music', 'field_music_chance').strip())
+                if fieldchance > 100 or fieldchance < 0: fieldchance = to_default('field_music_chance')
+                if rng.randint(1,100) > fieldchance:
                     byte &= 0b01111111
                     fanfare = True
                 else:
@@ -619,7 +623,176 @@ def process_formation_music(data, f_shufflefield):
             despoil("FORMATION {} assigned song {}".format(i, formsongs[i]))
             despoil("contains {} :: avg {}".format(forms[i], formlevels[i]))
     return byte_insert(data, auxlocs[0], auxdata, end=auxlocs[1])
+
+def process_sprite_portraits(data_in, f_merchant=False):
+    print "** Processing sprite portraits ..."
+    data = data_in
     
+    def tile_to_pixels(tile):
+        out = []
+        for r in range(0,8):
+            row = []
+            for c in range(0,8):
+                pixel = ( ord(tile[r*2]) >> (7-c) ) & 0x1
+                pixel += ( ( ord(tile[r*2+1]) >> (7-c) ) & 0x1 ) << 1
+                pixel += ( ( ord(tile[r*2+16]) >> (7-c) ) & 0x1 ) << 2
+                pixel += ( ( ord(tile[r*2+17]) >> (7-c) ) & 0x1 ) << 3
+                row.append(pixel)
+            out.append(row)
+        return out
+        
+    def pixels_to_tile(pels):
+        out = [0] * 32
+        for r in range(0,8):
+            for c in range(0,8):
+                out[r*2] |= ( pels[r][c] & 0x1 ) << (7-c)
+                out[r*2+1] |= ( ( pels[r][c] >> 1 ) & 0x1 ) << (7-c)
+                out[r*2+16] |= ( ( pels[r][c] >> 2 ) & 0x1 ) << (7-c)
+                out[r*2+17] |= ( ( pels[r][c] >> 3 ) & 0x1 ) << (7-c)
+        return out
+    
+    for pid in range(0,19):
+        sid = 20 if pid == 18 else pid
+        if pid == 16 and f_merchant: sid = 19
+        
+        sloc = 0x150000 + sid * 0x16A0
+        if pid >= 16: sloc -= 0x140 * (sid-16) # leo/banon/ghost/etc spritesheets are smaller
+        
+        #fout.seek(sloc + 32 * 0x3E)
+        loc = sloc + 32 * 0x3E
+        tiles = []
+        if set(data[loc:loc+64]) == set("\x00"):
+            loc += 64
+        for t in range(0,4):
+            #tiles.append(fout.read(32))
+            tiles.append(data[loc:loc+32])
+            loc += 32
+        ptiles = []
+        for t in tiles:
+            ptiles.append(tile_to_pixels(t))
+        
+        ztiles = []
+        for t in range(0,4):
+            tile = []
+            for r in range(0,8):
+                row = []
+                for c in range(0,8):
+                    row.append(ptiles[t][r][c])
+                    row.append(ptiles[t][r][c])
+                tile.append(row)
+                tile.append(row)
+            ztiles.append(tile)
+        
+        bitmap = []
+        for r in range(0,16):
+            bitmap.append( [0]*4 + ztiles[0][r] + ztiles[1][r] + [0]*4 )
+        for r in range(0,16):
+            bitmap.append( [0]*4 + ztiles[2][r] + ztiles[3][r] + [0]*4 )
+        bitmap = [ [0]*40 ] * 4 + bitmap + [ [0]*40 ] * 4
+        
+        btiles = []
+        for tr in range(0,5):
+            trow = []
+            for tc in range(0,5):
+                tile = []
+                for r in range(0,8):
+                    row = []
+                    for c in range(0,8):
+                        row.append(bitmap[ tr * 8 + r ][ tc * 8 + c ])
+                    tile.append(row)
+                trow.append(tile)
+            btiles.append(trow)
+        
+        tlayout = [ [ 0,  1,  2,  3,  8],
+                    [16, 17, 18, 19,  9],
+                    [ 4,  5,  6,  7, 10],
+                    [20, 21, 22, 23, 11],
+                    [13, 14, 15, 24, 12] ]
+        
+        offset = 0x2D1D00 + pid * 0x320
+        for r in range(0,5):
+            for c in range(0,5):
+                pos = tlayout[r][c] * 32
+                #fout.seek(offset + pos)
+                #fout.write("".join(map(chr,pixels_to_tile(btiles[r][c]))))
+                loc = offset + pos
+                data = byte_insert(data, loc, "".join(map(chr,pixels_to_tile(btiles[r][c]))))
+        
+        #fout.seek(0x02CE2B + sid)
+        #palid = ord(fout.read(1))
+        #fout.seek(0x2D6300 + palid * 32)
+        #palette = fout.read(32)
+        #fout.seek(0x2D5860 + pid * 32)
+        #fout.write(palette)
+        loc = 0x02CE2B + sid
+        palid = ord(data[loc])
+        loc = 0x2D6300 + palid * 32
+        palette = data[loc:loc+32]
+        loc = 0x2D5860 + pid * 32
+        data = byte_insert(data, loc, palette)
+        
+    # fix BC v64 messing up portrait pointers
+    loc = 0x036F00
+    pt = (range(0, 0x10) + ([0xE] if f_merchant else [0x10]) + [0x11, 0] +
+            ([0x10] if f_merchant else [1]) + [0x12, 0, 0, 0, 0, 0, 6])
+    porttable = "".join(map(chr, pt))
+    for i in xrange(0, 0x1B):
+        porttable = int_insert(porttable, len(porttable), 0x320*pt[i], 2)
+    print map(hex, map(ord, porttable))
+    data = byte_insert(data, loc, porttable, 0x4F)
+    
+    assert len(data_in) == len(data)
+    return data
+
+# tool to help exploratory design on a far future mode
+# not for public but if you find this and want to try it, knock yrself out
+def mangle_magic(data_in):
+    data = data_in
+    
+    #             [sprite] [ bg1 ] [ bg3 ] [palettes ] sfx ini [esper] spd
+    sanim_base = "\x7E\x02\xFF\xFF\xFF\xFF\x9D\x9D\x9D\x16\x1B\xFF\xFF\x10"
+    spell_base = "\x21\x00\x28\x09\x21\x05\x0A\x00\x00\xFF\x00\x00\x00\x00"
+    
+    animtable = ConfigParser.ConfigParser()
+    animtable.read('sdev')
+    
+    layertbl = {}
+    for lyr in ['1', '2', '3', '4']:
+        print lyr
+        for i, d in enumerate(animtable.get('sdev', lyr).split()):
+            print "{}: {} {}".format(i, type(d), d)
+        for id in animtable.get('sdev', lyr).split():
+            iid = int(id, 16)
+            if iid not in layertbl: layertbl[iid] = []
+            layertbl[iid].append(int(lyr))
+    
+    sanims, snames, spells = "", "", ""
+    for id in sorted(layertbl.keys()):
+        sid = id - 0x79
+        if sid < 0: continue
+        sanim = sanim_base
+        namel = ""
+        for lyr in [(1,0,'S'), (2,2,'1'), (3,4,'3'), (4,11,'E')]:
+            f_high = False if lyr[0] == 1 else False
+            if lyr[0] in layertbl[id]:
+                sanim = int_insert(sanim, lyr[1], id + f_high, 2)
+                namel += lyr[2]
+            else:
+                namel += "-"
+                
+        sname = "{} {}  ".format(hex(id)[2:].rjust(3,' '), namel)
+        if sid <= 64: sname = sname[1:3] + sname[4:9]
+        elif sid <= (64+35): sname = sname[:8]
+        sanims += sanim
+        snames += sname.translate(TO_BATTLETEXT)
+        spells += spell_base
+    
+    data = byte_insert(data, 0x107FB2, sanims, end=0x1097FF)
+    data = byte_insert(data, 0x26F567, snames, end=0x26FE8E)
+    data = byte_insert(data, 0x046AC0, spells, end=0x0478BF)
+    return data
+    
+        
 def dothething():
     print "Nascent Order supplemental randomizer for Final Fantasy VI by emberling"
     print "version {}".format(VERSION)
@@ -647,7 +820,6 @@ def dothething():
     if len(romsize) != 2:
         romsize = to_default('romsize')
     romsize = [int(o, 16) for o in romsize]
-    dprint(romsize)
     
     try:
         while True:
@@ -672,11 +844,31 @@ def dothething():
     if not seed: seed = int(time.time())
     seed = int(seed)
     print "Using seed {}".format(seed)
+    print
     rng.seed(seed)
     random = rng
     
-    # TODO: detect known romhacks
-    
+    # detect known romhacks
+    hackconfig = ConfigParser.ConfigParser()
+    hackconfig.read('hackdetect.txt')
+    for hack, infostr in hackconfig.items('HackDetection'):
+        info = [s.strip() for s in infostr.split(',')]
+        if len(info) >= 1:
+            mightbe = True
+            loc = int(info[0], 16)
+            if loc >= (len(data) - len(info)):
+                mightbe = False
+                break
+            for c in info[1:]:
+                cmp = chr(int(c, 16))
+                if data[loc] != cmp:
+                    mightbe = False
+                    break
+                loc += 1
+            if mightbe:
+                print "detected applied hack: {}".format(hack)
+                CONFIG.read("hd_"+hack+".txt")
+                
     # pick options
     defaultmodes = CONFIG.get('General', 'modes').strip()
     print
@@ -685,6 +877,7 @@ def dothething():
     print "or press enter to use default."
     print
     print "Your default is currently: {}".format(defaultmodes)
+    print "Change default modes by editing the first entry of config.txt"
     print
     print "Options: (lowercase)"
     print "  b - create battle music progression"
@@ -693,23 +886,33 @@ def dothething():
     print "  m - music randomizer"
     # p - redo character palettes
     # s - randomize spell effects and graphics????
-    # x - force pixelated portrait
+    print "  x - draw pixelated portraits for all characters"
     print
     print "keywords (all caps):"
-    print "  MUSICCHAOS - 'm' mode can put any song anywhere"
+    print "  MUSICCHAOS - songs that change choose from the entire pool of available songs"
     print "  ALTSONGLIST - uses songs_alt.txt instead of songs.txt for music config"
     print "  NOFIELDSHUFFLE - 'b' no longer changes which battles continue field music"
+    print "  GENERALSTORE - 'x' produces a merchant portrait using Leo's slot"
     print "  TESTFILE - always outputs to mytest.[smc]"
     print
     modes = raw_input("Select modes: ").strip()
     if len(modes) == 0: modes = defaultmodes
     
-    # do stuff
+    # *** BEGIN ACTUALLY DOING THINGS ***
+    
     if 'm' in modes or 'b' in modes:
         data = process_custom_music(data, 'm' in modes, 'b' in modes, 'MUSICCHAOS' in modes, 'ALTSONGLIST' in modes)
         if 'b' in modes:
             data = process_formation_music(data, 'NOFIELDSHUFFLE' not in modes)
-            
+
+    if 'x' in modes:
+        data = process_sprite_portraits(data, 'GENERALSTORE' in modes)
+
+    if 'MANGLEMAGIC' in modes:
+        data = mangle_magic(data)
+        
+    # *** END ACTUALLY DOING THINGS ***
+    
     f_testfile = True if "TESTFILE" in modes else False
     
     outfileprefix = "".join(inputfilename.split('.')[:-1])
@@ -738,6 +941,11 @@ if __name__ == "__main__":
     ARGS = list(sys.argv)
     CONFIG = ConfigParser.RawConfigParser(CONFIG_DEFAULTS)
     rng = random.Random()
+    
+    externtext = ' ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?/:"`-.,_;#+()%~*@'
+    battletext = "\xFE" + "".join(map(chr, range(0x80,0xD1)))
+    TO_BATTLETEXT = maketrans(externtext, battletext)
+    FROM_BATTLETEXT = maketrans(battletext, externtext)
     try:
         CONFIG.read('config.txt')
         dothething()
