@@ -1,4 +1,4 @@
-VERSION = "0.0.2a"
+VERSION = "0.0.2b"
 DEBUG = True
 import sys, traceback, ConfigParser, random, time, os.path, operator
 from copy import copy
