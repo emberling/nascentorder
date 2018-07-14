@@ -31,6 +31,14 @@ CONFIG_DEFAULTS = {
         'songdata': '85C7A, 9FDFF, 352200',
         'pausesongs': '506F9, 506FD',
         'battlesongs': '2BF3B, 2BF42',
+        'spritesheet': '150000',
+        'spritesizea': '16A0',
+        'spritesizeb': '1560',
+        'portraits': '2D1D00',
+        'portpals': '2D5860',
+        'portptrs': '36F00',
+        'charpalptrs': '2CE2B',
+        'charpals': '2D6300'
         }
 
 spoiler = {}
@@ -536,7 +544,6 @@ def process_formation_music(data, f_shufflefield):
     native_prefix = "ff6_"
     isetsize = 0x20
     
-    
     # build table of monster levels
     monsterlocs = [int(s.strip(),16) for s in CONFIG.get('EnemyPtr', 'monsters_loc').split(',')]
     if len(monsterlocs) != 2: monsterlocs = to_default('monsters_loc')
@@ -569,7 +576,6 @@ def process_formation_music(data, f_shufflefield):
         else:
             formlevels.append(0)
         forms.append(map(ord, form)) #debug
-        
                 
     # iterate aux form data and:
     #   if music is 1, chance to change it to 2
@@ -651,12 +657,21 @@ def process_sprite_portraits(data_in, f_merchant=False):
                 out[r*2+17] |= ( ( pels[r][c] >> 3 ) & 0x1 ) << (7-c)
         return out
     
+    o_spritesheet = 0x150000
+    o_spritesizea = 0x16A0
+    o_spritesizeb = 0x16A0 - 0x140
+    o_portraits = 0x2D1D00
+    o_portpals = 0x2D5860
+    o_portptrs = 0x036F00
+    o_charpalptrs = 0x02CE2B
+    o_charpals = 0x2D6300
+    
     for pid in range(0,19):
         sid = 20 if pid == 18 else pid
         if pid == 16 and f_merchant: sid = 19
         
-        sloc = 0x150000 + sid * 0x16A0
-        if pid >= 16: sloc -= 0x140 * (sid-16) # leo/banon/ghost/etc spritesheets are smaller
+        sloc = o_spritesheet + (min(sid,16) * o_spritesizea) + (max(0,sid-16) * o_spritesizeb)
+        #if pid >= 16: sloc -= 0x140 * (sid-16) # leo/banon/ghost/etc spritesheets are smaller
         
         #fout.seek(sloc + 32 * 0x3E)
         loc = sloc + 32 * 0x3E
@@ -709,7 +724,7 @@ def process_sprite_portraits(data_in, f_merchant=False):
                     [20, 21, 22, 23, 11],
                     [13, 14, 15, 24, 12] ]
         
-        offset = 0x2D1D00 + pid * 0x320
+        offset = o_portraits + pid * 0x320
         for r in range(0,5):
             for c in range(0,5):
                 pos = tlayout[r][c] * 32
@@ -724,15 +739,15 @@ def process_sprite_portraits(data_in, f_merchant=False):
         #palette = fout.read(32)
         #fout.seek(0x2D5860 + pid * 32)
         #fout.write(palette)
-        loc = 0x02CE2B + sid
+        loc = o_charpalptrs + sid
         palid = ord(data[loc])
-        loc = 0x2D6300 + palid * 32
+        loc = o_charpals + palid * 32
         palette = data[loc:loc+32]
-        loc = 0x2D5860 + pid * 32
+        loc = o_portpals + pid * 32
         data = byte_insert(data, loc, palette)
         
     # fix BC v64 messing up portrait pointers
-    loc = 0x036F00
+    loc = o_portptrs
     pt = (range(0, 0x10) + ([0xE] if f_merchant else [0x10]) + [0x11, 0] +
             ([0x10] if f_merchant else [1]) + [0x12, 0, 0, 0, 0, 0, 6])
     porttable = "".join(map(chr, pt))

@@ -71,13 +71,13 @@ ffmq_battle1:   I50, G40
 ffmq_boss:      I85, G80, metamorphosis, floatingcont, kefkastower
 ffmq_forest:    awakening, shadow, narshe, forest, martiallaw, mountain, serpent, town_ruin, ruin
 ffmq_fossil:    I30, G50, figaro, cyan, troops, umaro, floatingcont, kefkastower
-ffmq_gale:      I25, G90, locke, savethem, grandfinale, mountain, returners, umaro, catastrophe, floatingcont, kefkastower
+ffmq_gale:      I25, G90, locke, savethem, grandfinale, mountain, returners, umaro, catastrophe, floatingcont, kefkastower, fanfare, fanfareslow
 ffmq_rock:      I20, G05, setzer, chocobo, johnny, zozo, prelude*4
 ffmq_roll:      locke, setzer, chocobo, johnny, grandfinale, gogo, moogles
 ffmq_tower:     I55, G70, cyan, savethem, troops, umaro, floatingcont, kefkastower, catastrophe
 iog_boss:       I90, G55, metamorphosis, grandfinale, unforgiven*2
 lu1_boss:       I65, G50, savethem, metamorphosis, catastrophe, magitek, floatingcont, kefkastower
-lu2_battle:     I30, G20, unforgiven
+lu2_battle:     I30, G20, unforgiven, magitek
 lu2_boss:       I75, G35, savethem, magitek, floatingcont, kefkastower
 lu2_map:        awakening, balance, shadow, gau, locke, setzer, veldt, mountain*2, serpent, falcon
 lu2_mountain:   figaro, cyan, veldt, troops, martiallaw, mountain, returners, gogo, umaro
