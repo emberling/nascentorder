@@ -16,6 +16,7 @@ Song conversions:
     emberling -- ff5_ahead
                  ffmq_battle1, ffmq_boss, ffmq_forest, ffmq_fossil, ffmq_rock,
                  ffmq_roll, ffmq_tower
+                 lu2_battle
                  sd2_8bells, sd2_always, sd2_angel, sd2_city, sd2_desert,
                  sd2_eternal, sd2_flammie, sd2_forest, sd2_forget, sd2_ghost,
                  sd2_hope, sd2_intruder, sd2_jema, sd2_legend, sd2_lofty,
@@ -50,7 +51,6 @@ Song conversions:
                  xg_chuchu, xg_mermaid
                  zaol_overworld
                  zoot_storms
-    Jackimus -- lu2_battle*
     MetroidQuest -- ff4_baron, ff4_boss*, ff4_cave
                     ff5_bridge
     Royaken -- ff4_bomb*, ff4_mysidia, ff4_whale*
