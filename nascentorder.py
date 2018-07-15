@@ -51,7 +51,8 @@ DEFAULT_DEFAULTS = {
         }
         
 spoiler = {}
-        
+f_tellmewhy = False
+
 def dprint(msg):
     if DEBUG: print msg
 
@@ -103,16 +104,24 @@ def printspoiler(f, seed):
     separator = "--------------------"
     line("NaO SEED {} INFORMATION".format(seed) + '\n')
     line()
+    handled = ['Music']
     if 'Music' in spoiler:
         line("MUSIC")
         line(separator)
         for t in spoiler['Music']:
             line(t)
+    handled.append('Debug')
     if DEBUG and 'Debug' in spoiler:
         line()
         line("DEBUG")
         line(separator)
         for t in spoiler['Debug']:
+            line(t)
+    for k in [sk for sk in spoiler if sk not in handled]:
+        line()
+        line(k)
+        line(separator)
+        for t in spoiler[k]:
             line(t)
 
 def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglist):
@@ -133,7 +142,13 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         global spoiler
         if 'Music' not in spoiler: spoiler['Music'] = []
         spoiler['Music'].append(txt)
-        
+    
+    def spooler(txt):
+        global spoiler, f_tellmewhy
+        if f_tellmewhy:
+            if 'MusicPools' not in spoiler: spoiler['MusicPools'] = []
+            spoiler['MusicPools'].append(txt)
+            
     class SongSlot:
         def __init__(self, id, chance=0, is_pointer=True, data="\x00\x00\x00"):
             self.id = id
@@ -218,6 +233,9 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         if (intense or epic):
             intensitytable[song[0]] = (intense, epic)
     
+    for ident, s in songtable.items():
+        spooler("{} pool ({}/{}): {}".format(ident, len([i for i in s.choices if i == native_prefix + ident]), len(s.choices), s.choices))
+        
     # battle select
     def process_battleprog():
         newsongs = 0
@@ -1005,6 +1023,7 @@ def dothething():
     #print "  GENERALSTORE - 'x' produces a merchant portrait using Leo's slot"
     print "  PIXELPARTY - 'x' applies to all portraits"
     print "  TESTFILE - always outputs to mytest.[smc]"
+    print "  TELLMEWHY - add info random pools to spoiler"
     print
     modes = raw_input("Select modes: ").strip()
     
@@ -1035,6 +1054,10 @@ def dothething():
     
     # *** BEGIN ACTUALLY DOING THINGS ***
     
+    if 'TELLMEWHY' in modes:
+        global f_tellmewhy
+        f_tellmewhy = True
+        
     if 'm' in modes or 'b' in modes:
         data = process_custom_music(data, 'm' in modes, 'b' in modes, 'MUSICCHAOS' in modes, 'ALTSONGLIST' in modes)
         if 'b' in modes:
