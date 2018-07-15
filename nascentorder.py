@@ -1,12 +1,13 @@
 VERSION = "DEV 0.1.0"
 DEBUG = True
-import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib
+import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib, re
 from copy import copy
 from string import maketrans
 
 HIROM = 0xC00000
+defaultmode = 'bmx'
 CONFIG_DEFAULTS = {
-        'modes': 'mx',
+        'modes': defaultmode,
         'skip_hack_detection': 'False',
         'allow_music_repeats': 'False',
         'field_music_chance': '0',
@@ -40,7 +41,15 @@ CONFIG_DEFAULTS = {
         'charpalptrs': '2CE2B',
         'charpals': '2D6300'
         }
-
+DEFAULT_DEFAULTS = {
+        'mlast': defaultmode,
+        'mode1': defaultmode + ',not set',
+        'mode2': defaultmode + ',not set',
+        'mode3': defaultmode + ',not set',
+        'mode4': defaultmode + ',not set',
+        'lastfile': 'ff6.smc'
+        }
+        
 spoiler = {}
         
 def dprint(msg):
@@ -879,13 +888,19 @@ def mangle_magic(data_in):
     
         
 def dothething():
+    lastcfg = ConfigParser.ConfigParser(DEFAULT_DEFAULTS)
+    lastcfg.read('lastused.cfg')
+    
     print "Nascent Order supplemental randomizer for Final Fantasy VI by emberling"
     print "version {}".format(VERSION)
     print
     if len(ARGS) > 2:
         inputfilename = args[1].strip()
     else:
-        inputfilename = raw_input("Enter rom filename: ")
+        lastfile = lastcfg.get('LastUsed', 'lastfile')
+        print "Enter ROM filename, or press enter to use the same one as last time."
+        inputfilename = raw_input("Filename (default {}): ".format(lastfile))
+        if not inputfilename: inputfilename = lastfile
     
     # read the file
     inputfile = False
@@ -897,6 +912,8 @@ def dothething():
             inputfilename = raw_input("Enter rom filename: ")
     data = inputfile.read()
     inputfile.close()
+    
+    lastcfg.set('LastUsed', 'lastfile', inputfilename)
     
     # check for header, and adjust
     validbeginning = "\x20\x79\x68\x6B\x03\x00"
@@ -955,14 +972,21 @@ def dothething():
                 CONFIG.read("hd_"+hack+".txt")
                 
     # pick options
-    defaultmodes = CONFIG.get('General', 'modes').strip()
+    def getsavedmode(n, desc=False):
+        return [s.strip() for s in lastcfg.get('LastUsed', 'mode'+str(n)).split(',')][1 if desc else 0]
+        
+    defaultmodes = [lastcfg.get('LastUsed', 'mlast').strip()] + [getsavedmode(n) for n in range(1,5)]
+    defaultdescs = [""] + [getsavedmode(n, desc=True) for n in range(1,5)]
     print
     print "*** What do you want to do? ***"
     print "Type the letter for every option you want,"
-    print "or press enter to use default."
+    print "or press enter to use the same modes you used last time."
     print
-    print "Your default is currently: {}".format(defaultmodes)
-    print "Change default modes by editing the first entry of config.txt"
+    print "Last used modes: {}".format(defaultmodes[0])
+    print
+    print "Other saved modes:"
+    for n in xrange(1,5):
+        print "{} -- {}   {}".format(n, defaultmodes[n], "({})".format(defaultdescs[n]) if defaultdescs[n] else "")
     print
     print "Options: (lowercase)"
     print "  b - create battle music progression"
@@ -973,6 +997,7 @@ def dothething():
     # s - randomize spell effects and graphics????
     print "  x - replace placeholder portraits with zoomed-sprite portraits"
     print
+    print "  Include a number 1-4 to save selected modes in that slot for future use"
     print "keywords (all caps):"
     print "  MUSICCHAOS - songs that change choose from the entire pool of available songs"
     print "  ALTSONGLIST - uses songs_alt.txt instead of songs.txt for music config"
@@ -982,7 +1007,31 @@ def dothething():
     print "  TESTFILE - always outputs to mytest.[smc]"
     print
     modes = raw_input("Select modes: ").strip()
-    if len(modes) == 0: modes = defaultmodes
+    
+    
+    modeschanged = True
+    if len(modes) == 0:
+        modes = defaultmodes[0]
+        modeschanged = False
+    if modes in map(str, range(1,5)):
+        #print "using slot {}: {}".format(modes, defaultmodes[int(modes)])
+        modes = defaultmodes[int(modes)]
+        
+    # mode save config
+    
+    for i in xrange(1,5):
+        if str(i) in modes:
+            modes = re.sub('[1234,]', '', modes)
+            print "Saving >{}< as quick access slot {}.".format(modes, i)
+            descr = re.sub(',', '', raw_input("Enter description: "))
+            lastcfg.set('LastUsed', 'mode'+str(i), modes + ', ' + descr)
+            break
+    lastcfg.set('LastUsed', 'mlast', modes)
+    
+    with open('lastused.cfg', 'w') as cfg:
+        lastcfg.write(cfg)
+    
+    print "Processing, using modes >{}<".format(modes)
     
     # *** BEGIN ACTUALLY DOING THINGS ***
     
