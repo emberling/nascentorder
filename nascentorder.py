@@ -1,12 +1,12 @@
-VERSION = "0.1.0 dev"
+VERSION = "DEV 0.1.0"
 DEBUG = True
-import sys, traceback, ConfigParser, random, time, os.path, operator
+import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib
 from copy import copy
 from string import maketrans
 
 HIROM = 0xC00000
 CONFIG_DEFAULTS = {
-        'modes': 'm',
+        'modes': 'mx',
         'skip_hack_detection': 'False',
         'allow_music_repeats': 'False',
         'field_music_chance': '0',
@@ -630,7 +630,7 @@ def process_formation_music(data, f_shufflefield):
             despoil("contains {} :: avg {}".format(forms[i], formlevels[i]))
     return byte_insert(data, auxlocs[0], auxdata, end=auxlocs[1])
 
-def process_sprite_portraits(data_in, f_merchant=False):
+def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
     print "** Processing sprite portraits ..."
     data = data_in
     
@@ -665,8 +665,9 @@ def process_sprite_portraits(data_in, f_merchant=False):
     o_portptrs = 0x036F00
     o_charpalptrs = 0x02CE2B
     o_charpals = 0x2D6300
-    
-    for pid in range(0,19):
+        
+    def paint_portrait(data_in, pid):
+        data = data_in
         sid = 20 if pid == 18 else pid
         if pid == 16 and f_merchant: sid = 19
         
@@ -744,16 +745,85 @@ def process_sprite_portraits(data_in, f_merchant=False):
         loc = o_charpals + palid * 32
         palette = data[loc:loc+32]
         loc = o_portpals + pid * 32
-        data = byte_insert(data, loc, palette)
+        return byte_insert(data, loc, palette, 32)
+ 
+    ## decide whose portrait is getting changed
+    ## change portrait if both:
+    ## -- portrait is a known placeholder
+    ## -- sprite is not an approved user of that portrait
+    ## also, change portrait if two portraits are identical
+    ## if known placeholder, favor first in ph cfg file, otherwise favor low chr id
+    
+    orig_portraits, orig_palettes = [], []
+    hashcfg = ConfigParser.ConfigParser()
+    hashcfg.read("checksums.cfg")
+    porthashtbl = [[j.strip() for j in i[1].split(',')] for i in hashcfg.items('Portraits')]
+    porthashtbl = [h for h in porthashtbl if len(h) > 1]
+    porthashes = [h[0] for h in porthashtbl]
+    print "{} placeholder hashes identified".format(len(porthashes))
+    spriterecord = {}
+    if f_changeall:
+        changemap = [True] * 19
+    else:
+        changemap = [False] * 19
+        for p in xrange(0,21):
+            print "P {}".format(p)
+            if p in [18, 19]: continue
+            pp = 18 if p == 20 else p
+            pid = ord(data[o_portptrs + p])
+            sid = p #sid = 20 if pid == 18 else pid
+            loc = o_portraits + 0x320 * ord(data[o_portptrs + p])
+            thisport = data[loc:loc+0x320]
+            
+            thishash = hashlib.md5(thisport).hexdigest()
+            print "got portrait {} -- md5 {}".format(pid, thishash)
+            if thishash in porthashes:
+                spritehashes = porthashtbl[porthashes.index(thishash)][1:]
+                print "hash match (known ph). {} sprite hashes identified: {}".format(len(spritehashes), spritehashes)
+                sloc = o_spritesheet + (min(sid,16) * o_spritesizea) + (max(0,sid-16) * o_spritesizeb)
+                thissprite = data[sloc:sloc+o_spritesizeb]
+                shash = hashlib.md5(thissprite).hexdigest()
+                print "got sprite {} -- len {} md5 {}".format(sid, len(thissprite), shash)
+                if shash not in spritehashes:
+                    print "sprite not approved for placeholder. setting to change"
+                    changemap[pp] = True
+                else:
+                    thisidx = spritehashes.index(shash)
+                    if shash in spriterecord:
+                        if spriterecord[shash][1] <= thisidx:
+                            print "{} found in record, supersedes idx{}".format(spriterecord[shash][1],thisidx)
+                            changemap[pp] = True
+                        else:
+                            changemap[spriterecord[shash][0]] = False
+                            spriterecord[shash] = (pid, thisidx)
+                            print "recorded {} for {}".format(spriterecord[shash], shash)
+            elif thisport in orig_portraits:
+                print "this duplicates pid {}, setting to change".format(orig_portraits.index(thisport))
+                changemap[pp] = True
+                print changemap
+            orig_portraits.append(thisport)
+            
+            loc = o_portpals + pid * 32
+            thispal = data[loc:loc+32]
+            orig_palettes.append(thispal)
+
+            
+    for p in xrange(0,19):
+        if changemap[p]:
+            data = paint_portrait(data, p)
+        else:
+            loc = o_portraits + p * 0x320
+            data = byte_insert(data, loc, orig_portraits[p], 0x320)
+            loc = o_portpals + p * 32
+            data = byte_insert(data, loc, orig_palettes[p], 32)
         
     # fix BC v64 messing up portrait pointers
     loc = o_portptrs
     pt = (range(0, 0x10) + ([0xE] if f_merchant else [0x10]) + [0x11, 0] +
             ([0x10] if f_merchant else [1]) + [0x12, 0, 0, 0, 0, 0, 6])
     porttable = "".join(map(chr, pt))
-    for i in xrange(0, 0x1B):
+    for i in xrange(0,0x1B):
         porttable = int_insert(porttable, len(porttable), 0x320*pt[i], 2)
-    print map(hex, map(ord, porttable))
     data = byte_insert(data, loc, porttable, 0x4F)
     
     assert len(data_in) == len(data)
@@ -901,13 +971,14 @@ def dothething():
     print "  m - music randomizer"
     # p - redo character palettes
     # s - randomize spell effects and graphics????
-    print "  x - draw pixelated portraits for all characters"
+    print "  x - replace placeholder portraits with zoomed-sprite portraits"
     print
     print "keywords (all caps):"
     print "  MUSICCHAOS - songs that change choose from the entire pool of available songs"
     print "  ALTSONGLIST - uses songs_alt.txt instead of songs.txt for music config"
     print "  NOFIELDSHUFFLE - 'b' no longer changes which battles continue field music"
-    print "  GENERALSTORE - 'x' produces a merchant portrait using Leo's slot"
+    #print "  GENERALSTORE - 'x' produces a merchant portrait using Leo's slot"
+    print "  PIXELPARTY - 'x' applies to all portraits"
     print "  TESTFILE - always outputs to mytest.[smc]"
     print
     modes = raw_input("Select modes: ").strip()
@@ -921,7 +992,7 @@ def dothething():
             data = process_formation_music(data, 'NOFIELDSHUFFLE' not in modes)
 
     if 'x' in modes:
-        data = process_sprite_portraits(data, 'GENERALSTORE' in modes)
+        data = process_sprite_portraits(data, 'GENERALSTORE' in modes, 'PIXELPARTY' in modes)
 
     if 'MANGLEMAGIC' in modes:
         data = mangle_magic(data)
