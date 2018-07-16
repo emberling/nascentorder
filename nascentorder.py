@@ -124,6 +124,262 @@ def printspoiler(f, seed):
         for t in spoiler[k]:
             line(t)
 
+            
+# palette utilities. all of these are "good enough" approximates.
+# don't expect to translate from one to the other and back w/o lossiness
+char_hues = [ 0, 15, 30, 45, 60, 75, 90, 120, 150, 165, 180, 210, 240, 270, 300, 315, 330, 360 ]
+char_hues_unused = char_hues[:]
+
+huetranstable = {
+    0: [31, 0, 0],
+    60: [31, 31, 0],
+    120: [0, 31, 0],
+    180: [0, 31, 31],
+    240: [0, 0, 31],
+    300: [31, 0, 31],
+    }
+
+def hue_rgb(deg):
+    rgbtweentable = {0: 2, 60: -1, 120: 3, 180: -2, 240: 1, 300: -3}
+    while deg >= 360: deg -= 360
+    remainder = deg % 60
+    color = deg - remainder
+    rgb = list(huetranstable[color])
+    tween = rgbtweentable[color]
+    descending = False
+    if tween < 0:
+        descending = True
+    tween = abs(tween) - 1
+    print "color {} rgb {} tween {} desc {}".format(color, rgb, tween, descending)
+    remainder = int((((remainder + 1) * 32) / 60.0) - 1)
+    remainder = min(31, max(0, remainder))
+    print "remainder {}".format(remainder)
+    if descending: remainder = 31 - remainder
+    rgb[tween] = remainder
+    print "remainder {}, rgb {}".format(remainder, rgb)
+    return rgb
+    
+def hue_deg(rgb):
+    tweens = [i for i in rgb if i not in [0,31]]
+    assert len(tweens) <= 1
+    transtable = {tuple(v): k for k, v in huetranstable.items()}
+    if not tweens:
+        return transtable[tuple(rgb)]
+    shrunk = tuple([(31 if i == 31 else 0) for i in rgb])
+    grown = tuple([(0 if i == 0 else 31) for i in rgb])
+    bounds = (transtable[shrunk], transtable[grown])
+    prev = min(bounds)
+    next = max(bounds)
+    descending = False if prev == bounds[0] else True
+    if descending:
+        return int(next - (((tweens[0] + 1) * 60) / 32.0) - 1)
+    else:
+        return int((((tweens[0] + 1) * 60) / 32.0) - 1 + prev)
+
+def shuffle_char_hues(source_hues):
+    hues = map(hue_rgb, source_hues)
+    while True:
+        tryagain = False
+        rng.shuffle(hues)
+        for v in range(0,18,3): #check for too close colors vertically (within one palette)
+            chunk = hues[v:v+3]
+            for i in range(len(chunk)):
+                for j in range(i+1, len(chunk)):
+                    difference = [(c, d) for c, d in zip(chunk[i],chunk[j]) if c != d]
+                    if len(difference) < 1: difference.append((0,0))
+                    if len(difference) == 1:
+                        if abs(difference[0][0] - difference[0][1]) <= 8 or chunk[i] == chunk[j]:
+                            tryagain = True
+                if tryagain: break
+            if tryagain: break
+        if tryagain: continue
+        for h in range(0,3): #check for too close colors horizontally (same element on different palettes)
+            chunk = hues[h:len(hues):3]
+            for i in range(len(chunk)):
+                for j in range(i+1, len(chunk)):
+                    difference = [(c, d) for c, d in zip(chunk[i],chunk[j]) if c != d]
+                    if len(difference) < 1: difference.append((0,0))
+                    if len(difference) == 1 :
+                        if abs(difference[0][0] - difference[0][1]) <= 8:
+                            tryagain = True
+                if tryagain: break
+            if tryagain: break
+        if tryagain: continue
+        break
+    return hues
+
+def guess_hue(rgb):
+    assert len(rgb) >= 3
+    order = [rgb.index(min(rgb)), rgb.index(max(rgb))]
+    order = [order[0], [n for n in [0,1,2] if n not in order][0], order[1]]
+    color = list(rgb)
+    for c in color: c -= color[order[0]]
+    pct = color[order[1]] / float(color[order[2]])
+    pure = [0,0,0]
+    pure[order[1]] = int(31 * pct)
+    pure[order[2]] = 31
+    return hue_deg(pure)
+    
+    
+def process_sprite_fixes(data):
+        # # modified -- hopefully replacing Celes in chains with something appropriate
+        # if c == 6:
+            # fout.seek(spointers[c]+0xA20) # vertical unconscious pose
+            # swoon = fout.read(192)
+            # fout.seek(0x17D600 + 96) #docs show 17D600 but after testing needed +96
+            # fout.write(swoon)
+
+    pass
+    
+def process_char_palettes(data_in, f_cel, f_trance, f_rave):
+    global char_hues, char_hues_unused
+    char_hues_unused = shuffle_char_hues(char_hues)
+    data = data_in
+    
+    o_charpals = 0x2CE2B
+    o_fpaldata = 0x268000
+    o_bpaldata = 0x2D6300
+    
+    ## assign palettes to characters
+    twinpal = rng.randint(0,5)
+    char_palettes_forced = range(0,6) + range(1,6)
+    char_palettes_forced.remove(twinpal)
+    char_palettes_forced.append(random.choice(range(0,twinpal)+range(twinpal+1,6)))
+    while char_palettes_forced[0] == twinpal or char_palettes_forced[1] == twinpal:
+        random.shuffle(char_palettes_forced)
+    char_palettes_forced = char_palettes_forced[:4] + [twinpal, twinpal, 0] + char_palettes_forced[4:]
+    
+    ## assign colors to palettes
+    def components_to_color((red, green, blue)):
+        print "components_to_color {}".format((red, green, blue))
+        return red | (green << 5) | (blue << 10)
+        
+    def color_to_components(color): 
+        print "color_to_components {}".format(color)
+        blue = (color & 0x7c00) >> 10
+        green = (color & 0x03e0) >> 5
+        red = color & 0x001f
+        return (red, green, blue)
+        
+    def scalecolor(color, bot, top):
+        print "scalecolor {}  {}  {}".format(color, bot, top)
+        red, green, blue = color_to_components(color)
+        width = top - bot
+        lightest = max(red, green, blue)
+        red = int(round(width*(float(red)/float(lightest)))) + bot
+        green = int(round(width*(float(green)/float(lightest)))) + bot
+        blue = int(round(width*(float(blue)/float(lightest)))) + bot
+        return components_to_color((red, green, blue))
+        
+    def hsv_approx(hue, sat, val):
+        print "hsv_approx {}  {}  {}".format(hue, sat, val)
+        floor = (1 - (float(sat) / 100)) * 31 / 2
+        ceil = 31 - floor
+        new_color = list(color_to_components(scalecolor(components_to_color(tuple(hue)),
+                                                            int(floor), int(ceil))))
+        skewtoward = [0,0,0] if val <= 50 else [31,31,31]
+        skewamount = 1 - (float(val) / 50) if val <= 50 else (float(val) / 50) - 1
+        for i, c in enumerate(new_color):
+            new_color[i] = int(c * (1 - skewamount) + skewtoward[i] * skewamount)
+        new_color = [(c if c <= 31 else 31) for c in new_color]
+        new_color = [(c if c >= 0 else 0) for c in new_color] # just in case                
+        return new_color
+        
+    def nudge_hue(hue): #designed for 'pure' hue: one 31, one 0, one anything
+        print "nudge {}".format(hue)
+        new_color = hue[:]
+        if len([h for h in hue if h not in [0, 31] ]) > 0:
+            new_color = [(h if h in [0,31] else h + random.randint(-2,2)) for h in hue]
+        elif len([h for h in hue if h == 31]) >= 2:
+            nudge_idx = random.choice([i for i, h in enumerate(hue) if h == 31])
+            new_color[nudge_idx] -= random.randint(0,3)
+        elif 0 in hue:
+            nudge_idx = random.choice([i for i, h in enumerate(hue) if h == 0])
+            new_color[nudge_idx] += random.randint(0,3)
+        new_color = [(c if c <= 31 else 31) for c in new_color]
+        new_color = [(c if c >= 0 else 0) for c in new_color] # just in case
+        return new_color
+    
+    def generate_normal_palette(skintone, f_cel):
+        hair_hue = char_hues_unused.pop(0)
+        cloth_hue = char_hues_unused.pop(0)
+        acc_hue = char_hues_unused.pop(0)
+        new_palette = [[0,0,0], [3,3,3]] + list(skintone)
+        new_palette = map(components_to_color, new_palette) * 4
+        
+        hair_sat = rng.choice([rng.randint(15,30), rng.randint(20,50), rng.randint(20,75)])
+        hair_light = rng.choice([rng.randint(60,80), rng.randint(55,90)])
+        hair_dark = rng.randint(int(hair_light * .5),int(hair_light * .65)) if hair_sat < 40 else \
+                    rng.randint(int(hair_light * .45),int(hair_light * .52))
+        new_palette[4] = components_to_color(hsv_approx(nudge_hue(hair_hue), hair_sat + rng.randint(-7,8), hair_light))
+        new_palette[5] = components_to_color(hsv_approx(nudge_hue(hair_hue), hair_sat + rng.randint(-7,8), hair_dark))
+        new_palette[2] = components_to_color(hsv_approx(nudge_hue(hair_hue), rng.randint(80,100), rng.randint(93,100)))
+        new_palette[3] = components_to_color(hsv_approx(nudge_hue(hair_hue), rng.randint(10,100), rng.randint(10,25)))
+        
+        cloth_sat = rng.choice([rng.randint(10,50), rng.randint(30,60), rng.randint(10,85)])
+        cloth_light = rng.randint(32, max(40,hair_dark + 5))
+        cloth_dark = rng.randint(int(cloth_light * .6), int(cloth_light * .72))
+        new_palette[8] = components_to_color(hsv_approx(nudge_hue(cloth_hue), cloth_sat + rng.randint(-7,8), cloth_light))
+        new_palette[9] = components_to_color(hsv_approx(nudge_hue(cloth_hue), cloth_sat + rng.randint(-7,8), cloth_dark))
+        
+        acc_sat = rng.choice([rng.randint(10,25)] + [rng.randint(25,65)]*2 + [rng.randint(20,85)]*2)
+        acc_light = rng.randint(cloth_light + 10,min(100,max(80,cloth_light + 20)))
+        acc_dark = rng.randint(int(acc_light * .5), int(acc_light * .68)) if acc_sat < 50 else \
+                   rng.randint(int(acc_light * .4), int(acc_light * .52))
+        new_palette[10] = components_to_color(hsv_approx(nudge_hue(acc_hue), acc_sat + rng.randint(-7,8), acc_light))
+        new_palette[11] = components_to_color(hsv_approx(nudge_hue(acc_hue), acc_sat + rng.randint(-7,8), acc_dark))
+        
+        hues = [guess_hue(hair_hue), guess_hue(cloth_hue), guess_hue(acc_hue)]
+        used_range = set(xrange(hues[0]-15, hues[0]+15))
+        used_range.update(set(xrange(hues[1]-15, hues[1]+15)))
+        used_range.update(set(xrange(hues[2]-15, hues[2]+15)))
+        used_range.update([n-360 for n in used_range if n > 360])
+        town_hue = rng.choice([n for n in xrange(0,361) if n not in used_range])
+        town_sat = rng.choice([rng.randint(10,50), rng.randint(30,60), rng.randint(10,85)])
+        town_light = rng.randint(cloth_light, hair_light)
+        town_dark = rng.randint(int(town_light * .6), int(town_light * .72))
+        new_palette[12] = components_to_color(hsv_approx(nudge_hue(hue_rgb(town_hue)), town_sat + rng.randint(-7,8), town_dark))
+        new_palette[13] = components_to_color(hsv_approx(nudge_hue(hue_rgb(town_hue)), town_sat + rng.randint(-7,8), town_light))
+        
+        used_range.update(xrange(town_hue-15, town_hue+15))
+        aux_hue = rng.choice([n for n in xrange(0,361) if n not in used_range])
+        aux_sat = rng.choice([rng.randint(15,30), rng.randint(20,50), rng.randint(20,75)])
+        aux_light = rng.randint(cloth_light, hair_light)
+        aux_dark = rng.randint(int(aux_light * .6), int(aux_light * .72))
+        new_palette[14] = components_to_color(hsv_approx(nudge_hue(hue_rgb(aux_hue)), town_sat + rng.randint(-7,8), aux_dark))
+        new_palette[15] = components_to_color(hsv_approx(nudge_hue(hue_rgb(aux_hue)), town_sat + rng.randint(-7,8), aux_light))
+        
+        if f_cel:
+            for i in [5, 7, 9, 11]:
+                new_palette[i] = new_palette[i-1]
+            for i in [12, 14]:
+                new_palette[i] = new_palette[i+1]
+        
+        return new_palette
+        
+    spritecfg = ConfigParser.ConfigParser()
+    spritecfg.read('sprites.cfg')
+    skintonesraw = [v for k, v in spritecfg.items('SkinColor')]
+    skintones = []
+    for s in skintonesraw:
+        components = [int(t.strip()) for t in s.split(',')]
+        skintones.append(tuple((tuple(components[0:3]), tuple(components[3:6]))))
+    
+    rng.shuffle(skintones)
+    
+    new_palettes = []
+    for p in xrange(0,6):
+        new_palettes.append(generate_normal_palette(skintones.pop(), f_cel))
+        
+    for i, p in enumerate(new_palettes):
+        bin = '\x00' * 32
+        for j, c in enumerate(p):
+            bin = int_insert(bin, j*2, c, 2)
+        data = byte_insert(data, o_fpaldata + i*32, bin, 32)
+        data = byte_insert(data, o_bpaldata + i*32, bin, 32)
+    
+    return data
+        
 def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglist):
     print "** Processing random music ..." if f_randomize else "** Processing custom music ..."
     f_repeat = CONFIG.getboolean('Music', 'allow_music_repeats')
@@ -1009,9 +1265,9 @@ def dothething():
     print "Options: (lowercase)"
     print "  b - create battle music progression"
     # c - randomize character names, sprites, and portraits
-    # g - randomize character genders (includes script edits)
+    # g - script edits reflecting characters' randomized identities
     print "  m - music randomizer"
-    # p - redo character palettes
+    print "  p - redo character palettes"
     # s - randomize spell effects and graphics????
     print "  x - replace placeholder portraits with zoomed-sprite portraits"
     print
@@ -1023,7 +1279,7 @@ def dothething():
     #print "  GENERALSTORE - 'x' produces a merchant portrait using Leo's slot"
     print "  PIXELPARTY - 'x' applies to all portraits"
     print "  TESTFILE - always outputs to mytest.[smc]"
-    print "  TELLMEWHY - add info random pools to spoiler"
+    print "  TELLMEWHY - adds info about random pools to spoiler"
     print
     modes = raw_input("Select modes: ").strip()
     
@@ -1062,7 +1318,9 @@ def dothething():
         data = process_custom_music(data, 'm' in modes, 'b' in modes, 'MUSICCHAOS' in modes, 'ALTSONGLIST' in modes)
         if 'b' in modes:
             data = process_formation_music(data, 'NOFIELDSHUFFLE' not in modes)
-
+    
+    if 'p' in modes:
+        data = process_char_palettes(data, 'DISNEY' in modes, 'DYNE' in modes, 'GLOWSTICKS' in modes)
     if 'x' in modes:
         data = process_sprite_portraits(data, 'GENERALSTORE' in modes, 'PIXELPARTY' in modes)
 
