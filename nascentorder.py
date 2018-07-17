@@ -150,13 +150,10 @@ def hue_rgb(deg):
     if tween < 0:
         descending = True
     tween = abs(tween) - 1
-    print "color {} rgb {} tween {} desc {}".format(color, rgb, tween, descending)
     remainder = int((((remainder + 1) * 32) / 60.0) - 1)
     remainder = min(31, max(0, remainder))
-    print "remainder {}".format(remainder)
     if descending: remainder = 31 - remainder
     rgb[tween] = remainder
-    print "remainder {}, rgb {}".format(remainder, rgb)
     return rgb
     
 def hue_deg(rgb):
@@ -220,25 +217,72 @@ def guess_hue(rgb):
     pure[order[2]] = 31
     return hue_deg(pure)
     
+def process_misc_fixes(data_in):
+    data = data_in
+    ## TODO clean this up
+    # 2E85B1 '4C' -> '4F' keep Dark World song in WoR
+    loc = 0x2E85B1
+    if data[loc] == "\x4C":
+        data = byte_insert(data, loc, "\x4F")
     
-def process_sprite_fixes(data):
-        # # modified -- hopefully replacing Celes in chains with something appropriate
-        # if c == 6:
-            # fout.seek(spointers[c]+0xA20) # vertical unconscious pose
-            # swoon = fout.read(192)
-            # fout.seek(0x17D600 + 96) #docs show 17D600 but after testing needed +96
-            # fout.write(swoon)
-
-    pass
+    # Restore or zero out class names
+    loc = 0x3007DB
+    if data[loc:loc+5] == "\x93\x84\x91\x91\x80":
+        data = byte_insert(data, loc, "\xFF" * 0x70, end=0x30084A)
     
-def process_char_palettes(data_in, f_cel, f_trance, f_rave):
+    return data
+    
+def process_sprite_fixes(data_in):
+    data = data_in
+    
+    # Celes fix
+    o_chains = 0x17D696
+    o_newchains = 0x1587C0 + 0x6A * 32
+    # Also uses offsets from checksums.cfg
+    
+    # Celes fix
+    chains = data[o_newchains:o_newchains+32*6]
+    data = byte_insert(data, o_chains, chains, 32*6)
+    
+    # ultros, chupon
+    # recolors from /scratchpad
+    checksumcfg = ConfigParser.ConfigParser()
+    checksumcfg.read('checksums.cfg')
+    fixes = [i[1] for i in checksumcfg.items('Sprites')]
+    print fixes
+    
+    for fi in fixes:
+        f = [s.strip() for s in fi.split(',')]
+        if len(f) >= 4:
+            offset, length = int(f[0], 16), int(f[1], 16)
+            oldsprite = data[offset:offset+length]
+            print "{} {}".format(f[3], hashlib.md5(oldsprite).hexdigest())
+            if hashlib.md5(oldsprite).hexdigest() == f[2]:
+                try:
+                    with open(os.path.join("sprites", "fixes",f[3]), 'rb') as new:
+                        newsprite = new.read(length)
+                        data = byte_insert(data, offset, newsprite)
+                except IOError:
+                    print "couldn't read file {}".format(f[3])
+                    continue
+        else:
+            print "WARNING: improperly formatted entry {} in checksums.cfg/sprites".format(f)
+        #os.path.join("music", s.changeto + "_inst.bin"
+        
+    return data
+    
+def process_char_palettes(data_in, f_cel, f_rave):
     global char_hues, char_hues_unused
     char_hues_unused = shuffle_char_hues(char_hues)
     data = data_in
     
+    # palette id tables
     o_charpals = 0x2CE2B
+    o_menupals = 0x18EA60
+    # palette data
     o_fpaldata = 0x268000
     o_bpaldata = 0x2D6300
+    # also uses offsets from sprites.cfg[EventSprites]
     
     ## assign palettes to characters
     twinpal = rng.randint(0,5)
@@ -246,23 +290,40 @@ def process_char_palettes(data_in, f_cel, f_trance, f_rave):
     char_palettes_forced.remove(twinpal)
     char_palettes_forced.append(random.choice(range(0,twinpal)+range(twinpal+1,6)))
     while char_palettes_forced[0] == twinpal or char_palettes_forced[1] == twinpal:
-        random.shuffle(char_palettes_forced)
-    char_palettes_forced = char_palettes_forced[:4] + [twinpal, twinpal, 0] + char_palettes_forced[4:]
+        rng.shuffle(char_palettes_forced)
+    sprite_palettes = char_palettes_forced[:4] + [twinpal, twinpal, 0] + char_palettes_forced[4:]
     
+    spritecfg = ConfigParser.ConfigParser()
+    spritecfg.read('sprites.cfg')
+    offsets = dict(spritecfg.items('EventSprites'))
+    
+    for c in xrange(0, 14):
+        locs = [(o_menupals + c*18 + p) for p in [0, 4, 9, 13]] + [o_charpals + c]
+        if hex(c)[2:] in offsets:
+            locs.extend([int(s.strip(),16) for s in offsets[hex(c)[2:]].split(',')])
+        for i, loc in enumerate(locs):
+            p = sprite_palettes[c]
+            if i < 4: p = (ord(data[loc]) & 0xF1) | ((sprite_palettes[c] + 2) << 1)
+            data = int_insert(data, loc, p, 1)
+    
+    if 'moogles' in offsets:
+        if offsets['moogles']:
+            moogle_pals = range(0,6) * 2
+            rng.shuffle(moogle_pals)
+            for i, loc in enumerate([int(s.strip(),16) for s in offsets['moogles'].split(',')]):
+                data = int_insert(data, loc, sprite_palettes[c], 1)
+
     ## assign colors to palettes
     def components_to_color((red, green, blue)):
-        print "components_to_color {}".format((red, green, blue))
         return red | (green << 5) | (blue << 10)
         
     def color_to_components(color): 
-        print "color_to_components {}".format(color)
-        blue = (color & 0x7c00) >> 10
-        green = (color & 0x03e0) >> 5
-        red = color & 0x001f
+        blue = (color & 0x7C00) >> 10
+        green = (color & 0x03E0) >> 5
+        red = color & 0x001F
         return (red, green, blue)
         
     def scalecolor(color, bot, top):
-        print "scalecolor {}  {}  {}".format(color, bot, top)
         red, green, blue = color_to_components(color)
         width = top - bot
         lightest = max(red, green, blue)
@@ -272,7 +333,6 @@ def process_char_palettes(data_in, f_cel, f_trance, f_rave):
         return components_to_color((red, green, blue))
         
     def hsv_approx(hue, sat, val):
-        print "hsv_approx {}  {}  {}".format(hue, sat, val)
         floor = (1 - (float(sat) / 100)) * 31 / 2
         ceil = 31 - floor
         new_color = list(color_to_components(scalecolor(components_to_color(tuple(hue)),
@@ -286,7 +346,6 @@ def process_char_palettes(data_in, f_cel, f_trance, f_rave):
         return new_color
         
     def nudge_hue(hue): #designed for 'pure' hue: one 31, one 0, one anything
-        print "nudge {}".format(hue)
         new_color = hue[:]
         if len([h for h in hue if h not in [0, 31] ]) > 0:
             new_color = [(h if h in [0,31] else h + random.randint(-2,2)) for h in hue]
@@ -334,7 +393,7 @@ def process_char_palettes(data_in, f_cel, f_trance, f_rave):
         used_range.update(set(xrange(hues[1]-15, hues[1]+15)))
         used_range.update(set(xrange(hues[2]-15, hues[2]+15)))
         used_range.update([n-360 for n in used_range if n > 360])
-        town_hue = rng.choice([n for n in xrange(0,361) if n not in used_range])
+        town_hue = rng.choice([n for n in xrange(0,360) if n not in used_range])
         town_sat = rng.choice([rng.randint(10,50), rng.randint(30,60), rng.randint(10,85)])
         town_light = rng.randint(cloth_light, hair_light)
         town_dark = rng.randint(int(town_light * .6), int(town_light * .72))
@@ -342,7 +401,7 @@ def process_char_palettes(data_in, f_cel, f_trance, f_rave):
         new_palette[13] = components_to_color(hsv_approx(nudge_hue(hue_rgb(town_hue)), town_sat + rng.randint(-7,8), town_light))
         
         used_range.update(xrange(town_hue-15, town_hue+15))
-        aux_hue = rng.choice([n for n in xrange(0,361) if n not in used_range])
+        aux_hue = rng.choice([n for n in xrange(0,360) if n not in used_range])
         aux_sat = rng.choice([rng.randint(15,30), rng.randint(20,50), rng.randint(20,75)])
         aux_light = rng.randint(cloth_light, hair_light)
         aux_dark = rng.randint(int(aux_light * .6), int(aux_light * .72))
@@ -356,9 +415,48 @@ def process_char_palettes(data_in, f_cel, f_trance, f_rave):
                 new_palette[i] = new_palette[i+1]
         
         return new_palette
+    
+    def generate_trance_palette(f_cel):
+        sign = rng.choice([1, -1])
+        hues = [rng.randint(0,360)] # skin
+        hues.append(hues[0] + rng.randint(15,60) * sign) # hair
+        hues.append(hues[1] + rng.randint(15,60) * sign) # clothes
+        hues.append(hues[2] + rng.randint(15,60) * sign) # acc
+        hues.append(rng.randint(0,360)) #town
+        hues.append(rng.randint(0,360)) #aux
         
-    spritecfg = ConfigParser.ConfigParser()
-    spritecfg.read('sprites.cfg')
+        new_palette = [[0, 0, 0], [3, 3, 3]] * 8
+        
+        sats, vals = [], []
+        for i, h in enumerate(hues):
+            while hues[i] < 0: hues[i] += 360
+            while hues[i] >= 360: hues[i] -= 360
+            sats.append(rng.randint(80,100))
+            vals.append(rng.randint(80,100))
+        
+        new_palette[2]  = [31, 31, 31]
+        new_palette[3]  = hsv_approx(nudge_hue(hue_rgb(hues[1])), sats[1], rng.randint(15,30))
+        new_palette[4]  = hsv_approx(nudge_hue(hue_rgb(hues[1])), sats[1], vals[1])
+        new_palette[5]  = hsv_approx(nudge_hue(hue_rgb(hues[1])), sats[1], vals[1] * .66)
+        new_palette[6]  = hsv_approx(nudge_hue(hue_rgb(hues[0])), sats[0], vals[0])
+        new_palette[7]  = hsv_approx(nudge_hue(hue_rgb(hues[0])), sats[0], vals[0] * .66)
+        new_palette[8]  = hsv_approx(nudge_hue(hue_rgb(hues[2])), sats[2], vals[2])
+        new_palette[9]  = hsv_approx(nudge_hue(hue_rgb(hues[2])), sats[2], vals[2] * .66)
+        new_palette[10] = hsv_approx(nudge_hue(hue_rgb(hues[3])), sats[3], vals[3])
+        new_palette[11] = hsv_approx(nudge_hue(hue_rgb(hues[3])), sats[3], vals[3] * .66)
+        new_palette[12] = hsv_approx(nudge_hue(hue_rgb(hues[4])), sats[4], vals[4])
+        new_palette[13] = hsv_approx(nudge_hue(hue_rgb(hues[4])), sats[4], vals[4] * .66)
+        new_palette[14] = hsv_approx(nudge_hue(hue_rgb(hues[5])), sats[5], vals[5])
+        new_palette[15] = hsv_approx(nudge_hue(hue_rgb(hues[5])), sats[5], vals[5] * .66)
+        
+        if f_cel:
+            for i in [5, 7, 9, 11]:
+                new_palette[i] = new_palette[i-1]
+            for i in [12, 14]:
+                new_palette[i] = new_palette[i+1]
+                
+        return map(components_to_color, new_palette)
+
     skintonesraw = [v for k, v in spritecfg.items('SkinColor')]
     skintones = []
     for s in skintonesraw:
@@ -369,13 +467,17 @@ def process_char_palettes(data_in, f_cel, f_trance, f_rave):
     
     new_palettes = []
     for p in xrange(0,6):
-        new_palettes.append(generate_normal_palette(skintones.pop(), f_cel))
-        
-    for i, p in enumerate(new_palettes):
+        if f_rave:
+            new_palettes.append(generate_trance_palette(f_cel))
+        else:
+            new_palettes.append(generate_normal_palette(skintones.pop(), f_cel))
+    trance = generate_trance_palette(f_cel)
+    
+    for i, p in enumerate(new_palettes + [trance]):
         bin = '\x00' * 32
         for j, c in enumerate(p):
             bin = int_insert(bin, j*2, c, 2)
-        data = byte_insert(data, o_fpaldata + i*32, bin, 32)
+        data = byte_insert(data, o_fpaldata + (8 if i==6 else i)*32, bin, 32)
         data = byte_insert(data, o_bpaldata + i*32, bin, 32)
     
     return data
@@ -1266,6 +1368,7 @@ def dothething():
     print "  b - create battle music progression"
     # c - randomize character names, sprites, and portraits
     # g - script edits reflecting characters' randomized identities
+    print "  n - convert oldcharname to class, and other tiny misc NaO flavored fixes"
     print "  m - music randomizer"
     print "  p - redo character palettes"
     # s - randomize spell effects and graphics????
@@ -1276,7 +1379,7 @@ def dothething():
     print "  MUSICCHAOS - songs that change choose from the entire pool of available songs"
     print "  ALTSONGLIST - uses songs_alt.txt instead of songs.txt for music config"
     print "  NOFIELDSHUFFLE - 'b' no longer changes which battles continue field music"
-    #print "  GENERALSTORE - 'x' produces a merchant portrait using Leo's slot"
+    print "  MESSMEUP - 'p' no longer applies updates to known incompatible sprites"
     print "  PIXELPARTY - 'x' applies to all portraits"
     print "  TESTFILE - always outputs to mytest.[smc]"
     print "  TELLMEWHY - adds info about random pools to spoiler"
@@ -1320,15 +1423,24 @@ def dothething():
             data = process_formation_music(data, 'NOFIELDSHUFFLE' not in modes)
     
     if 'p' in modes:
-        data = process_char_palettes(data, 'DISNEY' in modes, 'DYNE' in modes, 'GLOWSTICKS' in modes)
+        data = process_char_palettes(data, 'DISNEY' in modes, 'GLOWSTICKS' in modes)
+        if 'MESSMEUP' not in modes:
+            data = process_sprite_fixes(data)
+            
     if 'x' in modes:
         data = process_sprite_portraits(data, 'GENERALSTORE' in modes, 'PIXELPARTY' in modes)
 
+    if 'n' in modes:
+        data = process_misc_fixes(data)
+        
     if 'MANGLEMAGIC' in modes:
         data = mangle_magic(data)
         
     # *** END ACTUALLY DOING THINGS ***
     
+    if len(data) > 0x300000 and len(data) <= 0x400000:
+        data = data + "\x00" * (0x400000 - len(data))
+        
     f_testfile = True if "TESTFILE" in modes else False
     
     outfileprefix = "".join(inputfilename.split('.')[:-1])
