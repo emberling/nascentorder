@@ -52,6 +52,7 @@ DEFAULT_DEFAULTS = {
         
 spoiler = {}
 f_tellmewhy = False
+npcdb = {}
 
 def dprint(msg):
     if DEBUG: print msg
@@ -271,8 +272,49 @@ def process_sprite_fixes(data_in):
         
     return data
     
+def process_npcdb(data_in, f_sprites=False):
+    global npcdb
+    
+    o_npcdata = 0x41D52
+    o_npcend = 0x46ABF
+
+    npcdata = data_in[o_npcdata:o_npcend+1]
+    
+    def dump_npc_data():
+        despoil()
+        despoil("NPC GFX DATA DUMP")
+        despoil("     -----     ")
+        loc = 0
+        usedsprites = set()
+        while loc < (o_npcend - o_npcdata - 6):
+            s = ord(npcdata[loc+6])
+            p = (ord(npcdata[loc+2]) & 0b00011100) >> 2
+            despoil("sprite {} -> palette {}".format(hex(s), hex(p)))
+            usedsprites.add((s, p))
+            loc += 9
+        despoil()
+        despoil(" NPCs use these sprites: ---")
+        despoil(repr(usedsprites))
+        despoil()
+        
+    dump_npc_data()
+    loc = 0
+    while loc < (o_npcend - o_npcdata - 6):
+        entry = npcdata[loc:loc+9]
+        s = ord(entry[6])
+        p = (ord(entry[2]) & 0b00011100) >> 2
+        if (s, p) in npcdb:
+            news, newp = npcdb[(s, p)]
+            newp = (newp << 2) | (ord(entry[2]) & 0b11100011)
+            entry = byte_insert(entry, 2, chr(newp))
+            entry = byte_insert(entry, 6, chr(news))
+            
+        loc += 9
+    
+    return data_in
+    
 def process_char_palettes(data_in, f_cel, f_rave):
-    global char_hues, char_hues_unused
+    global char_hues, char_hues_unused, npcdb
     char_hues_unused = shuffle_char_hues(char_hues)
     data = data_in
     
@@ -283,8 +325,10 @@ def process_char_palettes(data_in, f_cel, f_rave):
     o_fpaldata = 0x268000
     o_bpaldata = 0x2D6300
     # also uses offsets from sprites.cfg[EventSprites]
+    # TODO instead of using list of offsets, parse events data for sprite/palette setting
     
     ## assign palettes to characters
+    old_pals = map(ord, data[o_charpals:o_charpals+22])
     twinpal = rng.randint(0,5)
     char_palettes_forced = range(0,6) + range(1,6)
     char_palettes_forced.remove(twinpal)
@@ -293,6 +337,7 @@ def process_char_palettes(data_in, f_cel, f_rave):
         rng.shuffle(char_palettes_forced)
     sprite_palettes = char_palettes_forced[:4] + [twinpal, twinpal, 0] + char_palettes_forced[4:]
     
+    # by actor
     spritecfg = ConfigParser.ConfigParser()
     spritecfg.read('sprites.cfg')
     offsets = dict(spritecfg.items('EventSprites'))
@@ -313,6 +358,19 @@ def process_char_palettes(data_in, f_cel, f_rave):
             for i, loc in enumerate([int(s.strip(),16) for s in offsets['moogles'].split(',')]):
                 data = int_insert(data, loc, sprite_palettes[c], 1)
 
+    print sprite_palettes
+    print old_pals
+    # by npc (processed elsewhere)
+    for c in xrange(0,14):
+        dif = sprite_palettes[c] - old_pals[c]
+        while dif < 0: dif += 6
+        while dif >= 6: dif -= 6
+        for p in xrange(0,6):
+            newpal = p + dif
+            while newpal >= 6: newpal -= 6
+            npcdb[c, p] = (c, newpal)
+    for k in sorted(npcdb): print "k {}, v {}".format(k, npcdb[k])
+    
     ## assign colors to palettes
     def components_to_color((red, green, blue)):
         return red | (green << 5) | (blue << 10)
@@ -394,17 +452,17 @@ def process_char_palettes(data_in, f_cel, f_rave):
         used_range.update(set(xrange(hues[2]-15, hues[2]+15)))
         used_range.update([n-360 for n in used_range if n > 360])
         town_hue = rng.choice([n for n in xrange(0,360) if n not in used_range])
-        town_sat = rng.choice([rng.randint(10,50), rng.randint(30,60), rng.randint(10,85)])
+        town_sat = rng.choice([rng.randint(10,50), rng.randint(30,50), rng.randint(10,65)])
         town_light = rng.randint(cloth_light, hair_light)
-        town_dark = rng.randint(int(town_light * .6), int(town_light * .72))
+        town_dark = rng.randint(int(town_light * .6), int(town_light * .65))
         new_palette[12] = components_to_color(hsv_approx(nudge_hue(hue_rgb(town_hue)), town_sat + rng.randint(-7,8), town_dark))
         new_palette[13] = components_to_color(hsv_approx(nudge_hue(hue_rgb(town_hue)), town_sat + rng.randint(-7,8), town_light))
         
         used_range.update(xrange(town_hue-15, town_hue+15))
         aux_hue = rng.choice([n for n in xrange(0,360) if n not in used_range])
-        aux_sat = rng.choice([rng.randint(15,30), rng.randint(20,50), rng.randint(20,75)])
-        aux_light = rng.randint(cloth_light, hair_light)
-        aux_dark = rng.randint(int(aux_light * .6), int(aux_light * .72))
+        aux_sat = rng.choice([rng.randint(15,30), rng.randint(20,50)])
+        aux_light = rng.choice([rng.randint(min(town_light+15,90), 100), max(40, town_light - rng.randint(10,20))])
+        aux_dark = rng.randint(int(aux_light * .55), int(aux_light * .65))
         new_palette[14] = components_to_color(hsv_approx(nudge_hue(hue_rgb(aux_hue)), town_sat + rng.randint(-7,8), aux_dark))
         new_palette[15] = components_to_color(hsv_approx(nudge_hue(hue_rgb(aux_hue)), town_sat + rng.randint(-7,8), aux_light))
         
@@ -696,7 +754,7 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
             battleprog = process_battleprog()
             set_by_battleprog = battleprog[0] + battleprog[1]
         songs_to_change = [s for s in songs_to_change if s[1].id not in set_by_battleprog]
-        f_moveinst = False if check_ids_fit() else True
+        f_moveinst = False if check_ids_fit() or f_preserve else True
         rng.shuffle(songs_to_change)
         for ident, s in songs_to_change:
             choices = [c for c in songtable[ident].choices if c not in used_songs]
@@ -883,7 +941,7 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
     if f_battleprog:
         data = byte_insert(data, pausetableloc, pausetable, 5)
         data = byte_insert(data, battlesongsloc, battletable, 8)
-    data = int_insert(data, songcountloc, len(songtable), 1)
+    data = int_insert(data, songcountloc, len(songtable)+1, 1)
     if not f_moveinst: songptrdata = songptrdata[:songptraddrs[1] + 1]
     data = byte_insert(data, songptraddrs[0], songptrdata)
     if f_moveinst:
@@ -1057,15 +1115,12 @@ def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
         if pid == 16 and f_merchant: sid = 19
         
         sloc = o_spritesheet + (min(sid,16) * o_spritesizea) + (max(0,sid-16) * o_spritesizeb)
-        #if pid >= 16: sloc -= 0x140 * (sid-16) # leo/banon/ghost/etc spritesheets are smaller
         
-        #fout.seek(sloc + 32 * 0x3E)
         loc = sloc + 32 * 0x3E
         tiles = []
         if set(data[loc:loc+64]) == set("\x00"):
             loc += 64
         for t in range(0,4):
-            #tiles.append(fout.read(32))
             tiles.append(data[loc:loc+32])
             loc += 32
         ptiles = []
@@ -1114,17 +1169,9 @@ def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
         for r in range(0,5):
             for c in range(0,5):
                 pos = tlayout[r][c] * 32
-                #fout.seek(offset + pos)
-                #fout.write("".join(map(chr,pixels_to_tile(btiles[r][c]))))
                 loc = offset + pos
                 data = byte_insert(data, loc, "".join(map(chr,pixels_to_tile(btiles[r][c]))))
         
-        #fout.seek(0x02CE2B + sid)
-        #palid = ord(fout.read(1))
-        #fout.seek(0x2D6300 + palid * 32)
-        #palette = fout.read(32)
-        #fout.seek(0x2D5860 + pid * 32)
-        #fout.write(palette)
         loc = o_charpalptrs + sid
         palid = ord(data[loc])
         loc = o_charpals + palid * 32
@@ -1411,6 +1458,9 @@ def dothething():
     
     print "Processing, using modes >{}<".format(modes)
     
+    if len(data) <= 0x400000:
+        data = data + "\x00" * (0x400000 - len(data))
+    
     # *** BEGIN ACTUALLY DOING THINGS ***
     
     if 'TELLMEWHY' in modes:
@@ -1429,7 +1479,10 @@ def dothething():
             
     if 'x' in modes:
         data = process_sprite_portraits(data, 'GENERALSTORE' in modes, 'PIXELPARTY' in modes)
-
+    
+    if 'p' in modes:
+        data = process_npcdb(data)
+        
     if 'n' in modes:
         data = process_misc_fixes(data)
         
@@ -1437,9 +1490,6 @@ def dothething():
         data = mangle_magic(data)
         
     # *** END ACTUALLY DOING THINGS ***
-    
-    if len(data) > 0x300000 and len(data) <= 0x400000:
-        data = data + "\x00" * (0x400000 - len(data))
         
     f_testfile = True if "TESTFILE" in modes else False
     
