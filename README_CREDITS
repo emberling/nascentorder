@@ -12,10 +12,10 @@ docs on ff6hacking.com
 
 MEDIA INCLUDED:
 Song conversions:
-    songs marked with * include minor compatibility edits
     emberling -- ff5_ahead
                  ffmq_battle1, ffmq_boss, ffmq_forest, ffmq_fossil, ffmq_rock,
                  ffmq_roll, ffmq_tower
+                 lu2_battle
                  sd2_8bells, sd2_always, sd2_angel, sd2_city, sd2_desert,
                  sd2_eternal, sd2_flammie, sd2_forest, sd2_forget, sd2_ghost,
                  sd2_hope, sd2_intruder, sd2_jema, sd2_legend, sd2_lofty,
@@ -23,8 +23,8 @@ Song conversions:
                  sd2_prayer, sd2_prophecy, sd2_scorpion, sd2_sea, sd2_spirit,
                  sd2_star, sd2_steel, sd2_tasnica, sd2_thanatos, sd2_thunder,
                  sd2_tomorrow, sd2_town, sd2_wish
-    Gi Nattak -- cc_arni, cc_flame*, cc_miguel
-                 ct_boss2*
+    Gi Nattak -- cc_arni, cc_flame, cc_miguel
+                 ct_boss2
                  ff1_battle, ff1_dungeon
                  ff3_darkworld, ff3_eureka
                  ff4_airship, ff4_babil, ff4_golbez, ff4_longway,
@@ -35,13 +35,13 @@ Song conversions:
                  ff6_town2
                  ff7_5years, ff7_costa, ff7_temple, ff7_tifa
                  ff8_laguna, ff8_oath
-                 ff9_blackmage*, ff9_blackwaltz, ff9_dali, ff9_eiko,
+                 ff9_blackmage, ff9_blackwaltz, ff9_dali, ff9_eiko,
                  ff9_home, ff9_memoria
                  ffx_decision, ffx_zanarkand
                  ffmq_gale
                  iog_boss
                  lu1_boss
-                 lu2_battle, lu2_boss, lu2_map*, lu2_mountain
+                 lu2_boss, lu2_map, lu2_mountain
                  met3_brain
                  sd2_fortress, sd2_pureland, sd2_thick
                  sd3_paths
@@ -50,10 +50,10 @@ Song conversions:
                  xg_chuchu, xg_mermaid
                  zaol_overworld
                  zoot_storms
-    MetroidQuest -- ff4_baron, ff4_boss*, ff4_cave
+    MetroidQuest -- ff4_baron, ff4_boss, ff4_cave
                     ff5_bridge
-    Royaken -- ff4_bomb*, ff4_mysidia, ff4_whale*
-               ff7_hurry2*, ff7_judgment*, ff7_materia*, ff7_planet*
-               ff8_heresy*
-               ff9_messenger*
-               ffx_ambition*
+    Royaken -- ff4_bomb, ff4_mysidia, ff4_whale
+               ff7_hurry2, ff7_judgment*, ff7_materia, ff7_planet
+               ff8_heresy
+               ff9_messenger
+               ffx_ambition
