@@ -155,7 +155,8 @@ ff6_gestahl:    gestahl*2, town_ruin, ruin, fanatics, omen3*4
 ff6_troops:     troops, martiallaw, returners, omen3
 ff6_martiallaw: martiallaw*2, shadow, celes, narshe, zozo, town_ruin, omen3
 ff6_metamorphosis: metamorphosis*2, grandfinale, unforgiven, floatingcont, kefkastower
-ff6_train:      train*3, narshe, shadow, zozo, town_ruin, ruin, omen3
+ff6_train_ext:  narshe, shadow, zozo, town_ruin, ruin, omen3
+ff6_train:      train*3
 ff6_espers:     espers*2, shadow, strago, celes, forest, train, serpent, town_ruin, ruin, omen3
 ff6_grandfinale: I80, G50, grandfinale*4, setzer, chocobo, johnny, gogo, umaro, spinachrag, falcon
 ff6_mountain:   mountain, locke, veldt, troops, serpent, zozo, gogo, returners, umaro
