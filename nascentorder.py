@@ -866,7 +866,7 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
                 if streak >= 64: freelocs.append((i-streak, i))
             songdatalocs = freelocs
         if f_moveinst:
-            instsize = len(songtable) * 0x20
+            instsize = (len(songtable)+1) * 0x20
             for i, l in enumerate(songdatalocs):
                 if l[1] - l[0] > instsize:
                     new_instloc = (songdatalocs[i][0], songdatalocs[i][0] + instsize - 1)
