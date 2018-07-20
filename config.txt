@@ -4,7 +4,7 @@
 [General]
 # set default modes
 ;modes: m ALTSONGLISTMUSICCHAOSTESTFILE ; for testing single music files
-modes: bmx TESTFILE
+modes: bnmpx
 
 # by default, NaO will attempt to detect some known romhacks and adjust
 # pointers accordingly. Set this to prevent this behavior if you are getting
@@ -13,7 +13,7 @@ modes: bmx TESTFILE
 
 [Music]
 # self explanatory, uncomment to activate
-allow_music_repeats: True
+;allow_music_repeats: True
 
 # how often battles will continue playing field music
 field_music_chance: 0

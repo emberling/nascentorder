@@ -734,7 +734,10 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
             songtable[ident].changeto = native_prefix + ident
         else:
             songs_to_change.append((ident, s))
-            
+            if f_mchaos and len(songconfig.items('Imports')) < len(songtable):
+                if not songconfig.has_option('Imports', ident):
+                    songconfig.set('Imports', native_prefix + ident, "")
+    
     # build choice lists
     intensitytable = {}
     for song in songconfig.items('Imports'):
@@ -879,6 +882,7 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
             if not choices: choices.append(native_prefix + ident)
             newsong = rng.choice(choices)
             if (newsong in used_songs) and (not f_repeat):
+                #print "bounced setting {} as {}".format(newsong, ident)
                 keeptrying = True
                 break
             else:
