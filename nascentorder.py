@@ -303,7 +303,7 @@ def process_npcdb(data_in, f_sprites=False):
         despoil(" NPCs use these sprites: ---")
         despoil(repr(usedsprites))
         despoil()
-        
+    
     dump_npc_data()
     loc = 0
     while loc < (o_npcend - o_npcdata - 6):
@@ -320,6 +320,90 @@ def process_npcdb(data_in, f_sprites=False):
         loc += 9
     
     return byte_insert(data_in, o_npcdata, npcdata, end=o_npcend)
+    
+def process_actor_events(data_in):
+    global npcdb
+    
+    ## walk events and adjust relevant actor changes
+    ## 
+    
+    o_eventstart = 0xA0000
+    o_eventend = 0xCE5FF
+    edata = data_in[o_eventstart:o_eventend+1]
+    
+    commands = {}
+    commandtable = ConfigParser.ConfigParser()
+    commandtable.read(os.path.join("tables", "eventcommands.txt"))
+    for k, v in commandtable.items('EventCommandLength'):
+        line = [s.strip() for s in v.split(',')]
+        for i, entry in enumerate(line):
+            if '-' in entry:
+                e = [s.strip() for s in entry.split('-')]
+                thisentry = e.pop()
+                line.extend([hex(n)[2:] for n in range(int(e[0], 16), int(thisentry, 16))])
+            else: thisentry = entry
+            try:
+                commands[int(thisentry,16)] = int(k)
+            except ValueError:
+                commands[int(thisentry,16)] = k
+    
+    def cmdtype(cmd):
+        if ord(cmd) in commands:
+            return commands[ord(cmd)]
+        return 0
+    
+    loc = 0
+    start = 0
+    actorsdefault = [29]*16
+    actorsprites = copy(actorsdefault)
+    while loc < len(edata):
+        cmd = edata[loc]
+        
+        if cmd == "\x37":
+            actor, graphic = ord(edata[loc+1]), ord(edata[loc+2])
+#            print "{}: assign graphic {} to actor {}".format(hex(loc), hex(graphic), hex(actor)
+            actorsprites[actor] = graphic
+        elif cmd == "\x43":
+            actor, palette = ord(edata[loc+1]), ord(edata[loc+2])
+#            print "{}: assign palette {} to actor {}".format(hex(loc), hex(palette), hex(actor)
+            if (actorsprites[actor], palette) in npcdb:
+                edata = int_insert(edata, loc+2, npcdb[(actorsprites[actor], palette)][1], 1)
+            else:
+                dprint("note: in event {} set palette {} to actor {} using sprite {}".format(hex(start+o_eventstart), palette, actor, actorsprites[actor]))
+        elif cmd == "\xFE":
+#            print "end of event {} ~ {}".format(hex(start+o_eventstart), hex(loc+o_eventstart))
+            start = loc + 1
+            actorsprites = copy(actorsdefault)
+        
+        f_detail = False
+        if cmdtype(cmd) == 'queue':
+            if f_detail: print "{}: {} -- q{}".format(hex(loc), hex(ord(cmd)), hex(ord(edata[loc+1])))
+            loc += 1
+            dest = loc + ord(edata[loc])
+            while loc < dest:
+                if edata[loc] == '\xFF': break
+                loc += 1
+        elif cmdtype(cmd) == 'bitmap':
+            if f_detail: print "{}: {} -- b{}*{}".format(hex(loc), hex(ord(cmd)), hex(ord(edata[loc+1])), hex(ord(edata[loc+2])))
+            size = ord(edata[loc+3])*ord(edata[loc+4])
+            loc += 4 + size            
+        elif cmdtype(cmd) == 'query':
+            if f_detail: print "{}: {} -- ???".format(hex(loc), hex(ord(cmd)))
+            while edata[loc] != '\xFE' and ord(edata[loc+3]) <= 2:
+                if f_detail: print "???"
+                loc += 3
+        elif cmdtype(cmd) == 'switch':
+            if f_detail: print "{}: {} -- s{}".format(hex(loc), hex(ord(cmd)), hex(ord(edata[loc+1])))
+            loc += 1
+            loc += ord(edata[loc]) * 3
+        elif cmdtype(cmd) and isinstance(cmdtype(cmd), int):
+            if f_detail: print "{}: {} -- {}".format(hex(loc), hex(ord(cmd)), cmdtype(cmd))
+            loc += cmdtype(cmd)
+        else:
+            if f_detail: print "{}: {} ||".format(hex(loc), hex(ord(cmd)))
+        loc += 1
+    
+    return byte_insert(data_in, o_eventstart, edata, end=o_eventend)
     
 def process_char_palettes(data_in, f_cel, f_rave):
     global char_hues, char_hues_unused, npcdb
@@ -338,17 +422,18 @@ def process_char_palettes(data_in, f_cel, f_rave):
     ## assign palettes to characters
     old_pals = map(ord, data[o_charpals:o_charpals+22])
     twinpal = rng.randint(0,5)
-    char_palettes_forced = range(0,6) + range(1,6)
+    char_palettes_forced = range(0,6) + range(0,6)
     char_palettes_forced.remove(twinpal)
-    char_palettes_forced.append(random.choice(range(0,twinpal)+range(twinpal+1,6)))
+    char_palettes_forced.append(random.choice(range(0,twinpal)+range(twinpal+0,6)))
     while char_palettes_forced[0] == twinpal or char_palettes_forced[1] == twinpal:
         rng.shuffle(char_palettes_forced)
-    sprite_palettes = char_palettes_forced[:4] + [twinpal, twinpal, 0] + char_palettes_forced[4:]
+    sprite_palettes = char_palettes_forced[:4] + [twinpal, twinpal] + char_palettes_forced[4:]
     
     # by actor
     spritecfg = ConfigParser.ConfigParser()
     spritecfg.read('sprites.cfg')
-    offsets = dict(spritecfg.items('EventSprites'))
+    f_use_event_sprite_table = False
+    offsets = dict(spritecfg.items('EventSprites')) if f_use_event_sprite_table else {}
     
     for c in xrange(0, 14):
         locs = [(o_menupals + c*18 + p) for p in [0, 4, 9, 13]] + [o_charpals + c]
@@ -377,7 +462,8 @@ def process_char_palettes(data_in, f_cel, f_rave):
             newpal = p + dif
             while newpal >= 6: newpal -= 6
             npcdb[c, p] = (c, newpal)
-    for k in sorted(npcdb): print "k {}, v {}".format(k, npcdb[k])
+    npcdb[(0x41, old_pals[6])] = (0x41, sprite_palettes[6]) #celes chained
+    #for k in sorted(npcdb): print "k {}, v {}".format(k, npcdb[k])
     
     ## assign colors to palettes
     def components_to_color((red, green, blue)):
@@ -1501,6 +1587,7 @@ def dothething():
             data = process_formation_music(data, 'NOFIELDSHUFFLE' not in modes)
     
     if 'p' in modes:
+        #data = process_actor_events(data)
         data = process_char_palettes(data, 'DISNEY' in modes, 'GLOWSTICKS' in modes)
         if 'MESSMEUP' not in modes:
             data = process_sprite_fixes(data)
@@ -1509,6 +1596,7 @@ def dothething():
         data = process_sprite_portraits(data, 'GENERALSTORE' in modes, 'PIXELPARTY' in modes)
     
     if 'p' in modes:
+        data = process_actor_events(data)
         data = process_npcdb(data)
         
     if 'n' in modes:
