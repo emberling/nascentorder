@@ -389,7 +389,7 @@ def process_actor_events(data_in):
             loc += 4 + size            
         elif cmdtype(cmd) == 'query':
             if f_detail: print "{}: {} -- ???".format(hex(loc), hex(ord(cmd)))
-            while edata[loc] != '\xFE' and ord(edata[loc+3]) <= 2:
+            while edata[loc+1] != '\xFE' and ord(edata[loc+3]) <= 2:
                 if f_detail: print "???"
                 loc += 3
         elif cmdtype(cmd) == 'switch':
@@ -462,7 +462,8 @@ def process_char_palettes(data_in, f_cel, f_rave):
             newpal = p + dif
             while newpal >= 6: newpal -= 6
             npcdb[c, p] = (c, newpal)
-    npcdb[(0x41, old_pals[6])] = (0x41, sprite_palettes[6]) #celes chained
+    for i in range(0,6):
+        npcdb[(0x41, i)] = (0x41, sprite_palettes[6]) #celes chained
     #for k in sorted(npcdb): print "k {}, v {}".format(k, npcdb[k])
     
     ## assign colors to palettes
