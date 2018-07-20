@@ -228,16 +228,22 @@ def process_misc_fixes(data_in):
     
     # Restore or zero out class names
     loc = 0x3007DB
+    o_end = 0x30084A
     if data[loc:loc+5] == "\x93\x84\x91\x91\x80":
-        data = byte_insert(data, loc, "\xFF" * 0x70, end=0x30084A)
-    
+        #data = byte_insert(data, loc, "\xFF" * 0x70, end=0x30084A)
+        classdata = "\xFF" * 0x70
+        classes = ["Witch", "Hunter", "Knight", "Merc", "Queen", "Bear", "Genrl.",
+                "Sage", "Artist", "Gamblr", "Moogle", "Feral", "Enigma", "Yeti"]
+        for i, c in enumerate(classes):
+            classdata = byte_insert(classdata, i*8, classes[i].translate(TO_BATTLETEXT), 6)
+        data = byte_insert(data, loc, classdata, end=o_end)
     return data
     
 def process_sprite_fixes(data_in):
     data = data_in
     
     # Celes fix
-    o_chains = 0x17D696
+    o_chains = 0x17D660
     o_newchains = 0x1587C0 + 0x6A * 32
     # Also uses offsets from checksums.cfg
     
@@ -308,10 +314,11 @@ def process_npcdb(data_in, f_sprites=False):
             newp = (newp << 2) | (ord(entry[2]) & 0b11100011)
             entry = byte_insert(entry, 2, chr(newp))
             entry = byte_insert(entry, 6, chr(news))
+            npcdata = byte_insert(npcdata, loc, entry, 9)
             
         loc += 9
     
-    return data_in
+    return byte_insert(data_in, o_npcdata, npcdata, end=o_npcend)
     
 def process_char_palettes(data_in, f_cel, f_rave):
     global char_hues, char_hues_unused, npcdb
@@ -418,9 +425,23 @@ def process_char_palettes(data_in, f_cel, f_rave):
         return new_color
     
     def generate_normal_palette(skintone, f_cel):
+        
+        def nudge_apart(dynamic, static, threshold=10):
+            if static - dynamic >= 360-threshold: dynamic += 360
+            if dynamic - static >= 360-threshold: static += 360
+            if dynamic in range(static,static+threshold):
+                dynamic = static + threshold
+            elif dynamic in range(static,static-threshold):
+                dynamic = static - threshold
+            while dynamic >= 360:
+                dynamic -= 360
+            return dynamic
+        
+        skin_hue = guess_hue(list(skintone[0]))
         hair_hue = char_hues_unused.pop(0)
-        cloth_hue = char_hues_unused.pop(0)
-        acc_hue = char_hues_unused.pop(0)
+        cloth_hue = hue_rgb(nudge_apart(hue_deg(char_hues_unused.pop(0)), skin_hue))
+        acc_hue = hue_rgb(nudge_apart(hue_deg(char_hues_unused.pop(0)), skin_hue))
+        
         new_palette = [[0,0,0], [3,3,3]] + list(skintone)
         new_palette = map(components_to_color, new_palette) * 4
         
@@ -452,6 +473,7 @@ def process_char_palettes(data_in, f_cel, f_rave):
         used_range.update(set(xrange(hues[2]-15, hues[2]+15)))
         used_range.update([n-360 for n in used_range if n > 360])
         town_hue = rng.choice([n for n in xrange(0,360) if n not in used_range])
+        town_hue = nudge_apart(town_hue, skin_hue)
         town_sat = rng.choice([rng.randint(10,50), rng.randint(30,50), rng.randint(10,65)])
         town_light = rng.randint(cloth_light, hair_light)
         town_dark = rng.randint(int(town_light * .6), int(town_light * .65))
@@ -460,6 +482,7 @@ def process_char_palettes(data_in, f_cel, f_rave):
         
         used_range.update(xrange(town_hue-15, town_hue+15))
         aux_hue = rng.choice([n for n in xrange(0,360) if n not in used_range])
+        aux_hue = nudge_apart(aux_hue, skin_hue)
         aux_sat = rng.choice([rng.randint(15,30), rng.randint(20,50)])
         aux_light = rng.choice([rng.randint(min(town_light+15,90), 100), max(40, town_light - rng.randint(10,20))])
         aux_dark = rng.randint(int(aux_light * .55), int(aux_light * .65))
@@ -477,6 +500,8 @@ def process_char_palettes(data_in, f_cel, f_rave):
     def generate_trance_palette(f_cel):
         sign = rng.choice([1, -1])
         hues = [rng.randint(0,360)] # skin
+        if hues[0] in range(20,40): # -- discourage skin-colored skin
+            hues[0] = rng.randint(0,360)
         hues.append(hues[0] + rng.randint(15,60) * sign) # hair
         hues.append(hues[1] + rng.randint(15,60) * sign) # clothes
         hues.append(hues[2] + rng.randint(15,60) * sign) # acc
