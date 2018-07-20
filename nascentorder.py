@@ -219,6 +219,7 @@ def guess_hue(rgb):
     return hue_deg(pure)
     
 def process_misc_fixes(data_in):
+    print "** Processing misc. fixes ..."
     data = data_in
     ## TODO clean this up
     # 2E85B1 '4C' -> '4F' keep Dark World song in WoR
@@ -230,6 +231,7 @@ def process_misc_fixes(data_in):
     # Restore or zero out class names
     loc = 0x3007DB
     o_end = 0x30084A
+    print "        Original names -> class names"
     if data[loc:loc+5] == "\x93\x84\x91\x91\x80":
         #data = byte_insert(data, loc, "\xFF" * 0x70, end=0x30084A)
         classdata = "\xFF" * 0x70
@@ -241,6 +243,7 @@ def process_misc_fixes(data_in):
     return data
     
 def process_sprite_fixes(data_in):
+    print "** Replacing suboptimal sprites ..."
     data = data_in
     
     # Celes fix
@@ -257,14 +260,13 @@ def process_sprite_fixes(data_in):
     checksumcfg = ConfigParser.ConfigParser()
     checksumcfg.read('checksums.cfg')
     fixes = [i[1] for i in checksumcfg.items('Sprites')]
-    print fixes
     
     for fi in fixes:
         f = [s.strip() for s in fi.split(',')]
         if len(f) >= 4:
             offset, length = int(f[0], 16), int(f[1], 16)
             oldsprite = data[offset:offset+length]
-            print "{} {}".format(f[3], hashlib.md5(oldsprite).hexdigest())
+            #print "{} {}".format(f[3], hashlib.md5(oldsprite).hexdigest())
             if hashlib.md5(oldsprite).hexdigest() == f[2]:
                 try:
                     with open(os.path.join("sprites", "fixes",f[3]), 'rb') as new:
@@ -280,6 +282,7 @@ def process_sprite_fixes(data_in):
     return data
     
 def process_npcdb(data_in, f_sprites=False):
+    print "** Processing NPCs ..."
     global npcdb
     
     o_npcdata = 0x41D52
@@ -322,6 +325,7 @@ def process_npcdb(data_in, f_sprites=False):
     return byte_insert(data_in, o_npcdata, npcdata, end=o_npcend)
     
 def process_actor_events(data_in):
+    print "** Processing events ..."
     global npcdb
     
     ## walk events and adjust relevant actor changes
@@ -369,7 +373,7 @@ def process_actor_events(data_in):
             if (actorsprites[actor], palette) in npcdb:
                 edata = int_insert(edata, loc+2, npcdb[(actorsprites[actor], palette)][1], 1)
             else:
-                dprint("note: in event {} set palette {} to actor {} using sprite {}".format(hex(start+o_eventstart), palette, actor, actorsprites[actor]))
+                pass#dprint("note: in event {} set palette {} to actor {} using sprite {}".format(hex(start+o_eventstart), palette, actor, actorsprites[actor]))
         elif cmd == "\xFE":
 #            print "end of event {} ~ {}".format(hex(start+o_eventstart), hex(loc+o_eventstart))
             start = loc + 1
@@ -406,6 +410,7 @@ def process_actor_events(data_in):
     return byte_insert(data_in, o_eventstart, edata, end=o_eventend)
     
 def process_char_palettes(data_in, f_cel, f_rave):
+    print "** Processing palettes ..."
     global char_hues, char_hues_unused, npcdb
     char_hues_unused = shuffle_char_hues(char_hues)
     data = data_in
@@ -451,9 +456,9 @@ def process_char_palettes(data_in, f_cel, f_rave):
             for i, loc in enumerate([int(s.strip(),16) for s in offsets['moogles'].split(',')]):
                 data = int_insert(data, loc, sprite_palettes[c], 1)
 
-    print sprite_palettes
-    print old_pals
-    # by npc (processed elsewhere)
+    #print sprite_palettes
+    #print old_pals
+    ## by npc (processed elsewhere)
     for c in xrange(0,14):
         dif = sprite_palettes[c] - old_pals[c]
         while dif < 0: dif += 6
@@ -990,7 +995,7 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         space = [e - b for b, e in songdatalocs]
         songdata = [""] * len(space)
         songinst = data[isetlocs[0]:isetlocs[1]+1]    
-        dprint("    free space for music: {}".format(space))
+        #dprint("    free space for music: {}".format(space))
         for ident, s in songtable.items():
             #dprint("attempting to insert {} in slot {} ({})".format(s.changeto, s.id, ident))
             for i, l in enumerate(songdatalocs):
@@ -1305,7 +1310,7 @@ def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
     porthashtbl = [[j.strip() for j in i[1].split(',')] for i in hashcfg.items('Portraits')]
     porthashtbl = [h for h in porthashtbl if len(h) > 1]
     porthashes = [h[0] for h in porthashtbl]
-    print "{} placeholder hashes identified".format(len(porthashes))
+    #print "{} placeholder hashes identified".format(len(porthashes))
     spriterecord = {}
     if f_changeall:
         changemap = [True] * 19
