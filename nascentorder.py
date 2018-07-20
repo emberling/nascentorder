@@ -1453,6 +1453,8 @@ def dothething():
     print "  ALTSONGLIST - uses songs_alt.txt instead of songs.txt for music config"
     print "  NOFIELDSHUFFLE - 'b' no longer changes which battles continue field music"
     print "  MESSMEUP - 'p' no longer applies updates to known incompatible sprites"
+    print "  DISNEY - (p) advanced state-of-the-art cel shader mode"
+    print "  GLOWSTICKS - (p) trance palettes for everyone"
     print "  PIXELPARTY - 'x' applies to all portraits"
     print "  TESTFILE - always outputs to mytest.[smc]"
     print "  TELLMEWHY - adds info about random pools to spoiler"
