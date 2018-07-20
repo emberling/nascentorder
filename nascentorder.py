@@ -222,9 +222,10 @@ def process_misc_fixes(data_in):
     data = data_in
     ## TODO clean this up
     # 2E85B1 '4C' -> '4F' keep Dark World song in WoR
-    loc = 0x2E85B1
-    if data[loc] == "\x4C":
-        data = byte_insert(data, loc, "\x4F")
+    # THIS IS BROKEN AND MAKES MODE7 AFTER K@N CRASH
+#    loc = 0x2E85B1
+#    if data[loc] == "\x4C":
+#        data = byte_insert(data, loc, "\x4F")
     
     # Restore or zero out class names
     loc = 0x3007DB
