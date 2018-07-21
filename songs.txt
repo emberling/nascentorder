@@ -14,10 +14,11 @@ cc_arni:        gau, relm, town, prelude
 cc_flame:       I75, G95, kefka, metamorphosis, grandfinale, catastrophe, floatingcont, fanatics, kefkastower
 cc_miguel:      prelude, awakening, gau, rachel, gestahl, train, grandfinale, ruin, fanatics, omen3
 ct_boss2:       I90, G60, savethem, metamorphosis, grandfinale, catastrophe, floatingcont, kefkastower
+ds4_lyll:       I30, G40, prelude, cyan, locke, setzer, chocobo, savethem, grandfinale, mountain, serpent, unforgiven, floatingcont, falcon
 ff1_battle:     I15, G00, grandfinale, unforgiven
 ff1_dungeon:    I60, G35, metamorphosis, grandfinale, unforgiven*2, kefkastower
 ff3_darkworld:  locke, setzer, chocobo, veldt, mountain, fanatics
-ff3_eureka:     I00, G85, prelude, balance, shadow, cyan, setzer, espers, mountain, serpent, floatingcont, falcon, fanatics, kefkastower
+ff3_eureka:     prelude, balance, shadow, cyan, setzer, espers, mountain, serpent, floatingcont, falcon, fanatics, kefkastower
 ff4_airship:    locke, setzer, chocobo, grandfinale, fanfare, blackjack, falcon
 ff4_babil:      troops, mountain, returners, magitek, fanatics
 ff4_baron:      figaro, troops, returners, kefka
@@ -181,7 +182,7 @@ ff6_magitek:    magitek*8, kefkastower
 ff6_floatingcont: I40, G80, floatingcont*4, chocobo, kefka, metamorphosis, umaro, magitek, kefkastower, boss, atma
 ff6_falcon:     falcon*4, balance, shadow, cyan, locke, setzer, mountain, serpent, town_ruin
 ff6_fanatics:   fanatics, omen3
-ff6_kefkastower: kefkastower*2, floatingcont, omen3
+ff6_kefkastower:kefkastower*2, floatingcont, omen3
 ff6_ruin:       ruin*8, narshe, forest, train, zozo, omen3*8
 
 [SongSlots]
