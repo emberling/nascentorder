@@ -1,0 +1,27 @@
+0.1.0:
+    -new mode: 'x' -- generates portraits based on sprites. this draws from the top 16x16 of the battle ready pose, or bottom 16x16 if the top 8 pixel rows of the pose are empty. by default, only portraits which fulfill one of these criteria will be replaced:
+        - is a portrait from the base game, but the sprite it is applied to is not that character's original sprite, nor a known variation
+        - is a duplicate of another character's portrait
+        The keyword 'PIXELPARTY' ignores these constraints and applies consistent faux-retro portraits to every character.
+    -new mode: 'p' -- generates random palettes for characters, actors, and NPCs. this uses a vastly different and (in my opinion) improved method compared to Beyond Chaos, greatly improving its functionality with custom sprites and improving the flexibility available to custom sprite makers, who previously had to avoid the pitfalls of the dreaded red/green clown palette used by Kefka and the zombie-like pale monstrosity used by Umaro.
+        - Biased toward variety -- palettes will now be used a roughly equal number of times throughout your party, every time. No more seeds where everyone looks the same at first glance.
+        - Biased toward human perception -- instead of treating the entire color spectrum equally, this mode skews more toward the areas of the spectrum where color differentiation is most apparent.
+        - A much larger variety of skin color than the original game.
+        - Less immersion-breaking, in service of my eventual goal to have a randomly generated FF6 that is every bit as internally consistent and polished as the original
+            - Traitorous Imperial generals now maintain a consistent palette even when imprisoned.
+            - Twins, including royal ones, now share the same palette, and thus generally the same hair and skin color.
+        - Consistent pattern for sprite artists to work from:
+            0. transparency
+            1. borders (these change color during various status effects)
+            2. white -- this is now always lightly tinted toward HairColor
+            3. near-black -- this is also always tinted toward HairColor
+            4-5. hair -- this is the lightest of the three main color types, with almost always relatively low saturation.
+            6-7. skin -- rather than being generated, this is chosen from a curated list in sprites.cfg
+            8-9. clothing -- this is the darkest of the three color types, with a wide variety of saturation. Clothing Light and Hair Dark are generally around the same brightness. Clothing Dark is between near-black and Hair Dark, and can be used in a gradient with those with reasonable effectiveness. (2-4-5-9-3 light-to-dark)
+            10-11. accessory -- this has variable brightness and usually high saturation, though it has a chance for very low saturation instead (gray).
+            12-15. town palette -- these are used only on NPCs and still somewhat of a work in progress. their parameters are similar to accessory, though 12-13 is a bit darker and 14-15 less saturated. these are in dark-light order instead of light-dark, which matches the original usage EXCEPT for palette 5, which was used only by Ultros and Chupon.
+        Due to the palette 5 adjustment mentioned above, as well as the game's occasional penchant for using "skin color" as shading for hair, this mode includes replacement sprites for several NPCs. The only difference from the original is the colors used. These will not overwrite customized sprites and can be disabled entirely by the code MESSMEUP.
+        -Code 'DISNEY': activates advanced state-of-the-art cel shader mode
+        -Code 'GLOWSTICKS': everybody trance now
+    - new mode 'n' -- this mode is a catch-all for applying any changes that are too small for their own mode, but are necessary to adjust the Twitch-friendly, challenge-focused recent development of Beyond Chaos to the more casual-friendly, narrative- and coherency-focused vision of the larger NaO project.
+        - changes "original character name" display to instead display a class name that reflects the character's role in the story, generally agnostic to the more mechanical aspects that are randomized.

@@ -235,7 +235,7 @@ def process_misc_fixes(data_in):
     if data[loc:loc+5] == "\x93\x84\x91\x91\x80":
         #data = byte_insert(data, loc, "\xFF" * 0x70, end=0x30084A)
         classdata = "\xFF" * 0x70
-        classes = ["Witch", "Hunter", "Knight", "Merc", "Queen", "Bear", "Genrl.",
+        classes = ["Witch", "Hunter", "Knight", "Merc", "Ruler", "Bear", "Genrl.",
                 "Sage", "Artist", "Gamblr", "Moogle", "Feral", "Enigma", "Yeti"]
         for i, c in enumerate(classes):
             classdata = byte_insert(classdata, i*8, classes[i].translate(TO_BATTLETEXT), 6)
