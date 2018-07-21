@@ -3,7 +3,8 @@
 
 [General]
 # set default modes
-modes: bm
+;modes: m ALTSONGLISTMUSICCHAOSTESTFILE ; for testing single music files
+modes: bnmpx
 
 # by default, NaO will attempt to detect some known romhacks and adjust
 # pointers accordingly. Set this to prevent this behavior if you are getting
@@ -13,6 +14,9 @@ modes: bm
 [Music]
 # self explanatory, uncomment to activate
 ;allow_music_repeats: True
+
+# how often battles will continue playing field music
+field_music_chance: 0
 
 # by default, the existing song data will be wiped and replaced,
 # preserving only songs that are still used, and repacking them throughout
@@ -96,3 +100,28 @@ modes: bm
 
 # battle song table
 ;battlesongs: 2BF3B, 2BF42
+
+[SpritePtr]
+# beginning of character sprites
+;spritesheet: 150000
+
+# size of each character sprite 0-15
+;spritesizea: 16A0
+
+# size of each character sprite 16-21
+;spritesizeb: 1560
+
+# location of character portrait gfx
+;portraits: 2D1D00
+
+# character portrait palettes
+;portpals: 2D5860
+
+# table assigning portraits to characters
+;portptrs: 36F00
+
+# table assigning palettes to characters in battle
+;charpalptrs: 2CE2B
+
+# character palette data
+;charpals = 2D6300
