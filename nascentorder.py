@@ -1,4 +1,4 @@
-VERSION = "DEV 0.1.0"
+VERSION = "0.1.0a"
 DEBUG = True
 import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib, re
 from copy import copy
