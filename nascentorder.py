@@ -1,6 +1,6 @@
 VERSION = "DEV 0.1.1"
 DEBUG = True
-import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib, re
+import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib, re, csv
 from copy import copy
 from string import maketrans
 
@@ -111,6 +111,12 @@ def printspoiler(f, seed):
         line(separator)
         for t in spoiler['Music']:
             line(t)
+    handled.append('Characters')
+    if 'Characters' in spoiler:
+        line("CHARACTERS")
+        line(separator)
+        for t in spoiler['Characters']:
+            line(t)
     handled.append('Debug')
     if DEBUG and 'Debug' in spoiler:
         line()
@@ -125,7 +131,64 @@ def printspoiler(f, seed):
         for t in spoiler[k]:
             line(t)
 
-            
+#expects tag/req pairs encased in longer iterables, for some reason.
+#why? i have no idea, and i wrote this two days ago. *shrug*
+def constraint_filter(choices, choices_idx, given, given_idx=0):
+    while len(given) < given_idx+2:
+        given.append([])
+    tags = given[given_idx]
+    if isinstance(tags, str):
+        tags = tags.split(' ')
+    tags = [s.strip() for s in tags if len(s.strip())]
+    constraints = given[given_idx+1]
+    if isinstance(constraints, str):
+        constraints = constraints.split(' ')
+    constraints = [s.strip() for s in constraints if len(s.strip()) > 1]
+    mustbe = [s[1:] for s in constraints if s[0] == '+']
+    mustnot = [s[1:] for s in constraints if s[0] == '-']
+    choices = list(choices)
+    for i, c in enumerate(choices):
+        c = list(c)
+        while len(choices[i]) < choices_idx+2:
+            c.append([])
+        if isinstance(c[choices_idx], str):
+            c[choices_idx] = c[choices_idx].split(' ')
+        c[choices_idx] = [s.strip() for s in c[choices_idx] if len(s.strip())]
+        if isinstance(c[choices_idx+1], str):
+            c[choices_idx+1] = c[choices_idx+1].split(' ')
+        c[choices_idx+1] = [s.strip() for s in c[choices_idx+1] if len(s.strip()) > 1]
+        choices[i] = c
+        
+    newchoices = []
+    for c in choices:
+        ctags = c[choices_idx]
+        cmustbe = [s[1:] for s in c[choices_idx+1] if s[0] == '+']
+        cmustnot = [s[1:] for s in c[choices_idx+1] if s[0] == '-']
+        mightwork = True
+        for m in mustbe:
+            if m not in ctags:
+                mightwork = False
+                break
+        if not mightwork: continue
+        for m in mustnot:
+            if m in ctags:
+                mightwork = False
+                break
+        if not mightwork: continue
+        for m in cmustbe:
+            if m not in tags:
+                mightwork = False
+                break
+        if not mightwork: continue
+        for m in cmustnot:
+            if m in tags:
+                mightwork = False
+                break
+        if not mightwork: continue
+        newchoices.append(c)
+    return newchoices
+    
+    
 # palette utilities. all of these are "good enough" approximates.
 # don't expect to translate from one to the other and back w/o lossiness
 char_hues = [ 0, 15, 30, 45, 60, 75, 90, 120, 150, 165, 180, 210, 240, 270, 300, 315, 330, 360 ]
@@ -236,7 +299,13 @@ def process_misc_fixes(data_in):
         #data = byte_insert(data, loc, "\xFF" * 0x70, end=0x30084A)
         classdata = "\xFF" * 0x70
         classes = ["Witch", "Hunter", "Knight", "Merc", "Ruler", "Bear", "Genrl.",
-                "Sage", "Artist", "Gamblr", "Moogle", "Feral", "Enigma", "Yeti"]
+                "Sage", "Artist", "Pilot", "Moogle", "Feral", "Enigma", "Beast"]
+        charcfg = ConfigParser.ConfigParser()
+        charcfg.read(os.path.join("custom", "SpriteImports.txt"))
+        charcfg = charcfg.items("Characters")
+        for i, c in enumerate(classes):
+            if hex(i)[2:] in charcfg:
+                classes[i] = charcfg[hex(i)[2:].split(',')[0].strip()]
         for i, c in enumerate(classes):
             classdata = byte_insert(classdata, i*8, classes[i].translate(TO_BATTLETEXT), 6)
         data = byte_insert(data, loc, classdata, end=o_end)
@@ -281,6 +350,124 @@ def process_sprite_fixes(data_in):
         
     return data
     
+def process_sprite_imports(data_in):
+    
+    o_charnames = 0x478C0
+    o_sprites = 0x150000
+    l_fullsprite = 0x16A0
+    
+    spritecfg = ConfigParser.ConfigParser()
+    allnames = {"female": set(), "neutral": set(), "male": set()}
+    spritecfg.read(os.path.join("custom", "SpriteImports.txt"))
+    
+    try:
+        with open(os.path.join("custom", "FemaleNames.txt"), "r") as nf:
+            for line in nf:
+                line = "".join([s for s in line if s.isalpha()])
+                if len(line) > 6: line = line[:6]
+                allnames['female'].add(line)
+        with open(os.path.join("custom", "NeutralNames.txt"), "r") as nf:
+            for line in nf:
+                line = "".join([s for s in line if s.isalpha()])
+                allnames['neutral'].add(line)
+        with open(os.path.join("custom", "MaleNames.txt"), "r") as nf:
+            for line in nf:
+                line = "".join([s for s in line if s.isalpha()])
+                allnames['male'].add(line)
+    except IOError:
+        print "ERROR: Could not open potential list of character names\n\n\n"
+        assert False
+        
+    class Actor:
+        def __init__(self, id, desc=None, gender="any", size="full", tags="", reqs=""):
+            self.id, self.desc, self.gender, self.size, self.tags, self.reqs = id, desc, gender, size, tags, reqs
+            if desc is None:
+                self.name = "Sprite {}".format(id)
+        def __repr__(self):
+            return repr(vars(self))
+            
+    class Sprite:
+        def __init__(self, name, gender, size, file, uniqueid="", tags="", reqs=""):
+            self.name, self.gender, self.size, self.file, self.uniqueid, self.tags, self.reqs = name, gender, size, file, uniqueid, tags, reqs
+        def __repr__(self):
+            return repr(vars(self))
+    def spoil(txt):
+        global spoiler
+        if 'Characters' not in spoiler: spoiler['Characters'] = []
+        spoiler['Characters'].append(txt)
+    
+    # parse config into actorlist & spritelist
+    allactors, allsprites = [], []
+    for k, v in spritecfg.items("Characters"):
+        line = [s.strip() for s in v.split(',')]
+        while len(line) < 5: line.append([])
+        print line
+        allactors.append(Actor(k, *line))
+    for k, v in spritecfg.items("Sprites"):
+        line = [s.strip() for s in v.split(',')]
+        while len(line) < 6: line.append([])
+        allsprites.append(Sprite(k, *line))
+        
+    iterations = 0
+    while True:
+        uniqueids_used, sprites_used, initials_used = set(), set(), set()
+        data = data_in
+        spritepos = o_sprites
+        retry = False
+        spoilertxt = []
+        for a in allactors: #TODO make sure this is ascending by id so that we can keep track of
+            id = int(a.id, 16)   # our position in the spritesheet as we insert
+            # constraints & purge dupes
+            spriteopts = constraint_filter([(s, s.tags, s.reqs) for s in allsprites], 1, (a.tags, a.reqs))
+            spriteopts = [s[0] for s in spriteopts if s[0].uniqueid not in uniqueids_used and s[0].name not in sprites_used]
+            #assign gender & name
+            if a.gender not in ["female", "male", "neutral"]:
+                a.gender = rng.choice(["female"]*9 + ["male"]*9 + ["neutral"]*2)
+            spriteopts = [s for s in spriteopts if s.gender == a.gender or (s.gender == "neutral" and rng.choice([True, False]))]
+            if id <= 13:
+                print a.gender
+                nameopts = [n for n in allnames[a.gender].union(allnames["neutral"]) if n[0] not in initials_used]
+                if not nameopts:
+                    retry = True
+                    break
+                a.name = rng.choice(nameopts)
+                initials_used.add(a.name[0])
+            #check filesize (nyi, everything is full size atm)
+            thissprite = rng.choice(spriteopts)
+            
+            #read image data
+            # (portrait goes here)
+            filename = os.path.join("sprites", thissprite.file + ".bin")
+            try:
+                with open(filename, "rb") as sf:
+                    sdata = sf.read()
+                if len(sdata) < l_fullsprite: raise IOError
+            except IOError:
+                print "WARNING: invalid spritesheet {}. Rerolling sprites...".format(filename)
+                retry = True
+                break
+            #write
+            if id <= 13:
+                romname = a.name.translate(TO_BATTLETEXT)
+                while len(romname) < 6: romname = romname + "\xFF"
+                if len(romname) > 6: romname = romname[:6]
+                data = byte_insert(data, o_charnames + 6*int(a.id, 16), romname, 6)
+            data = byte_insert(data, spritepos, sdata, l_fullsprite)
+            spritepos += l_fullsprite
+            if hasattr(a, 'name'):
+                spoilertxt.append("{} ({}) -> {} ({})".format(id, a.desc, a.name, thissprite.name))
+            else:
+                spoilertxt.append("{} ({}) ---> {}".format(id, a.desc, thissprite.name))
+        if iterations >= 1000:
+            print "ERROR: Couldn't generate a sprite configuration that fits the chosen constraints!"
+            print "You may need to add more sprites, lower some restrictions, or remove actors from randomization\n\n\n\n"
+            assert False
+        if retry == False:
+            break
+        raw_input("\nSomething failed. Retrying..")
+    for line in spoilertxt:
+        spoil(line)
+    return data
 def process_npcdb(data_in, f_sprites=False):
     print "** Processing NPCs ..."
     global npcdb
@@ -366,14 +553,16 @@ def process_actor_events(data_in):
         if cmd == "\x37":
             actor, graphic = ord(edata[loc+1]), ord(edata[loc+2])
 #            print "{}: assign graphic {} to actor {}".format(hex(loc), hex(graphic), hex(actor)
-            actorsprites[actor] = graphic
+            if actor < len(actorsprites):
+                actorsprites[actor] = graphic
         elif cmd == "\x43":
             actor, palette = ord(edata[loc+1]), ord(edata[loc+2])
 #            print "{}: assign palette {} to actor {}".format(hex(loc), hex(palette), hex(actor)
-            if (actorsprites[actor], palette) in npcdb:
-                edata = int_insert(edata, loc+2, npcdb[(actorsprites[actor], palette)][1], 1)
-            else:
-                pass#dprint("note: in event {} set palette {} to actor {} using sprite {}".format(hex(start+o_eventstart), palette, actor, actorsprites[actor]))
+            if actor < len(actorsprites):
+                if (actorsprites[actor], palette) in npcdb:
+                    edata = int_insert(edata, loc+2, npcdb[(actorsprites[actor], palette)][1], 1)
+                else:
+                    pass#dprint("note: in event {} set palette {} to actor {} using sprite {}".format(hex(start+o_eventstart), palette, actor, actorsprites[actor]))
         elif cmd == "\xFE":
 #            print "end of event {} ~ {}".format(hex(start+o_eventstart), hex(loc+o_eventstart))
             start = loc + 1
@@ -429,7 +618,7 @@ def process_char_palettes(data_in, f_cel, f_rave):
     twinpal = rng.randint(0,5)
     char_palettes_forced = range(0,6) + range(0,6)
     char_palettes_forced.remove(twinpal)
-    char_palettes_forced.append(random.choice(range(0,twinpal)+range(twinpal+0,6)))
+    char_palettes_forced.append(rng.choice(range(0,twinpal)+range(twinpal+0,6)))
     while char_palettes_forced[0] == twinpal or char_palettes_forced[1] == twinpal:
         rng.shuffle(char_palettes_forced)
     sprite_palettes = char_palettes_forced[:4] + [twinpal, twinpal] + char_palettes_forced[4:]
@@ -506,13 +695,13 @@ def process_char_palettes(data_in, f_cel, f_rave):
     def nudge_hue(hue): #designed for 'pure' hue: one 31, one 0, one anything
         new_color = hue[:]
         if len([h for h in hue if h not in [0, 31] ]) > 0:
-            new_color = [(h if h in [0,31] else h + random.randint(-2,2)) for h in hue]
+            new_color = [(h if h in [0,31] else h + rng.randint(-2,2)) for h in hue]
         elif len([h for h in hue if h == 31]) >= 2:
-            nudge_idx = random.choice([i for i, h in enumerate(hue) if h == 31])
-            new_color[nudge_idx] -= random.randint(0,3)
+            nudge_idx = rng.choice([i for i, h in enumerate(hue) if h == 31])
+            new_color[nudge_idx] -= rng.randint(0,3)
         elif 0 in hue:
-            nudge_idx = random.choice([i for i, h in enumerate(hue) if h == 0])
-            new_color[nudge_idx] += random.randint(0,3)
+            nudge_idx = rng.choice([i for i, h in enumerate(hue) if h == 0])
+            new_color[nudge_idx] += rng.randint(0,3)
         new_color = [(c if c <= 31 else 31) for c in new_color]
         new_color = [(c if c >= 0 else 0) for c in new_color] # just in case
         return new_color
@@ -1385,6 +1574,7 @@ def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
 
 # tool to help exploratory design on a far future mode
 # not for public but if you find this and want to try it, knock yrself out
+FXDB = set()
 def mangle_magic(data_in):
     data = data_in
     
@@ -1395,36 +1585,185 @@ def mangle_magic(data_in):
     animtable = ConfigParser.ConfigParser()
     animtable.read('sdev')
     
-    layertbl = {}
-    for lyr in ['1', '2', '3', '4']:
-        print lyr
-        for i, d in enumerate(animtable.get('sdev', lyr).split()):
-            print "{}: {} {}".format(i, type(d), d)
-        for id in animtable.get('sdev', lyr).split():
-            iid = int(id, 16)
-            if iid not in layertbl: layertbl[iid] = []
-            layertbl[iid].append(int(lyr))
-    
-    sanims, snames, spells = "", "", ""
-    for id in sorted(layertbl.keys()):
-        sid = id - 0x79
-        if sid < 0: continue
-        sanim = sanim_base
-        namel = ""
-        for lyr in [(1,0,'S'), (2,2,'1'), (3,4,'3'), (4,11,'E')]:
-            f_high = False if lyr[0] == 1 else False
-            if lyr[0] in layertbl[id]:
-                sanim = int_insert(sanim, lyr[1], id + f_high, 2)
-                namel += lyr[2]
-            else:
-                namel += "-"
+    def read_fxdb():
+        global FXDB
+        
+        def decomment(file):
+            for row in file:
+                rw = row.split('#')[0].strip()
+                print "{} {}".format(len(rw), rw)
+                if len([c for c in rw if c == ',']) >= 10:
+                    yield rw
+                else:
+                    print "warning: too few parameters in line: {}".format(rw)
                 
-        sname = "{} {}  ".format(hex(id)[2:].rjust(3,' '), namel)
-        if sid <= 64: sname = sname[1:3] + sname[4:9]
-        elif sid <= (64+35): sname = sname[:8]
-        sanims += sanim
-        snames += sname.translate(TO_BATTLETEXT)
-        spells += spell_base
+        with open(os.path.join("tables", "SpellEffects.txt"), "r") as f:
+            f = csv.reader(decomment(f))
+            
+            class SpellFx:
+                def __init__(self, line):
+                    self.id, self.name, self.role, self.layer, self.script, self.targets, self.palettes, self.colors, self.sounds, self.tags, self.reqs = line
+                    self.id = int(self.id, 16)
+                    self.script = [s.strip() for s in self.script if len(s) and s != "*"]
+                    self.sounds = [s.strip() for s in self.sounds if len(s) and s != "*"]
+                    self.tags = [s.strip() for s in self.tags.split(' ') if len(s.strip())]
+                    #self.reqs = [s.strip() for s in self.reqs.split(' ')]
+                def __repr__(self): return repr(vars(self))
+            for l in f:
+                FXDB.add(SpellFx(l))
+    
+    def parse_constraints(constraints, mustbe=None, mustnot=None):
+        if mustbe is None: mustbe = set()
+        if mustnot is None: mustnot = set()
+        if constraints.strip():
+            constraints = [s.strip() for s in constraints.split(' ') if len(s.strip())]
+            mustbe.update((s[1:] for s in constraints if s[0] == '+'))
+            mustnot.update((s[1:] for s in constraints if s[0] == '-'))
+        if '' in mustbe: mustbe.remove('')
+        if '' in mustnot: mustnot.remove('')
+        return mustbe, mustnot
+        
+    def generate_anim(constraints):
+        global FXDB
+        if not FXDB: read_fxdb()
+        
+        class SpellAnimSub:
+            def __init__(self, id, pal):
+                self.id, self.pal = id, pal
+            def __repr__(self): return "<ID {}, palette {}>".format(hex(self.id), hex(self.pal))
+        class SpellAnim:
+            def __init__(self, spr, bg1, bg3, ext, sound, script, spd, name):
+                self.spr, self.bg1, self.bg3, self.ext, self.sound, self.script, self.spd, self.name = spr, bg1, bg3, ext, sound, script, spd, name
+            def __repr__(self): return "-={}=-\n  sound {}, script {}, speed {}\n  Sprite {}\n  BG1    {}\n  BG3    {}\n  Extra  {}".format(self.name, self.sound, self.script, self.spd, self.spr, self.bg1, self.bg3, self.ext)
+            def encode(self):
+                bytestring = chr(self.spr.id & 0xFF) + chr(self.spr.id >> 8)
+                bytestring += chr(self.bg1.id & 0xFF) + chr(self.bg1.id >> 8)
+                bytestring += chr(self.bg3.id & 0xFF) + chr(self.bg3.id >> 8)
+                bytestring += chr(self.spr.pal) + chr(self.bg1.pal) + chr(self.bg3.pal)
+                bytestring += chr(self.sound) + chr(self.script)
+                bytestring += chr(self.ext.id & 0xFF) + chr(self.ext.id >> 8)
+                bytestring += chr(self.spd)
+                return bytestring
+                
+        blanksub = SpellAnimSub(0xFFFF, 0)
+        blankanim = SpellAnim(blanksub, blanksub, blanksub, blanksub, 0, 0x1B, 16, "       ")
+        found = False
+        while not found:
+            aout = SpellAnim(blanksub, blanksub, blanksub, blanksub, 0, 0x1B, 16, "       ")
+            failed = False
+            usedlayers = ""
+            mustbe, mustnot = parse_constraints(constraints)
+            isalready = set()
+            count = rng.choice([1] + [2]*12 + [3]*66 + [4])
+            anims = []
+            role = "core"
+            #print "creating animation with {} elements".format(count)
+            
+            while len(anims) < count:
+                #print " filling role {}".format(role)
+                #print " our spell must include tags {}".format(mustbe)
+                if count - len(anims) == 1:
+                    thismustbe = mustbe
+                else:
+                    thismustbe = set([c for c in mustbe if rng.randint(0,1) and c not in isalready])
+                #print " this element must be {}".format(thismustbe)
+                opts = [fx for fx in FXDB if role in fx.role]
+                #print " found {} options matching role".format(len(opts))
+                for l in usedlayers.strip(): opts = [fx for fx in opts if l not in fx.layer]
+                #print " found {} options in unused layers".format(len(opts))
+                for c in thismustbe:
+                    #print "looking for tag {} among options {}".format(c, [fx.tags for fx in opts])
+                    opts = [fx for fx in opts if c in fx.tags]
+                #print " found {} options fitting mustbe constraints {}".format(len(opts), thismustbe)
+                for c in mustnot:
+                    opts = [fx for fx in opts if c not in fx.tags]
+                #print " found {} options fitting mustnot constraints {}".format(len(opts), mustnot)
+                newopts = []
+                for o in opts:
+                    accept = True
+                    for c in parse_constraints(o.reqs)[1]:
+                        if c in isalready:
+                            accept = False
+                    if accept: newopts.append(o)
+                opts = newopts
+                #print " found {} options without conflicting mustnot constraints (already {})".format(len(opts), isalready)
+                if not opts:
+                    failed = True
+                    #print " no options, restarting"
+                    break
+                    
+                anims.append(rng.choice(opts))
+                #print " chose {}".format(anims[-1])
+                if 's' in anims[-1].layer:
+                    aout.spr = SpellAnimSub(anims[-1].id, 0x9D)
+                if '1' in anims[-1].layer:
+                    aout.bg1 = SpellAnimSub(anims[-1].id, 0x9D)
+                if '3' in anims[-1].layer:
+                    aout.bg3 = SpellAnimSub(anims[-1].id, 0x9D)
+                if 'e' in anims[-1].layer:
+                    aout.ext = SpellAnimSub(anims[-1].id, 0x9D)
+                usedlayers += anims[-1].layer
+                isalready.update(anims[-1].tags)
+                #print " layers used: {}\n tags applied: {}".format(usedlayers, isalready)
+                if role == "core":
+                    aout.name = byte_insert(aout.name, 0, anims[-1].name.strip(), end=3)
+                    role = "aux"
+                else:
+                    aout.name = byte_insert(aout.name, 4, anims[-1].name.strip(), end=6)
+                #print "adding constraints {} to existing +({}) -({})".format(anims[-1].reqs, mustbe, mustnot)
+                mustbe, mustnot = parse_constraints(anims[-1].reqs, mustbe, mustnot)
+                #print "new constraints are +({}) -({})".format(mustbe, mustnot)
+            if failed: continue
+            for c in mustbe:
+                if c not in isalready:
+                    #print " failed to meet constraints, restarting"
+                    continue
+            found = True
+        return aout
+    
+    f_random = True
+    if f_random:
+        # generate random spellsets for testing the algorithm
+        sanims, snames, spells = "", "", ""        
+        for i in xrange(0,20):
+            a = generate_anim("")
+            print repr(a)
+            spells += spell_base
+            snames += a.name.translate(TO_BATTLETEXT)
+            sanims += a.encode()
+            
+    else:
+        # generate predictable spellsets for testing effects
+        layertbl = {}
+        for lyr in ['1', '2', '3', '4']:
+            print lyr
+            for i, d in enumerate(animtable.get('sdev', lyr).split()):
+                print "{}: {} {}".format(i, type(d), d)
+            for id in animtable.get('sdev', lyr).split():
+                iid = int(id, 16)
+                if iid not in layertbl: layertbl[iid] = []
+                layertbl[iid].append(int(lyr))
+        
+        sanims, snames, spells = "", "", ""
+        for id in sorted(layertbl.keys()):
+            sid = id - 0x79
+            if sid < 0: continue
+            sanim = sanim_base
+            namel = ""
+            for lyr in [(1,0,'S'), (2,2,'1'), (3,4,'3'), (4,11,'E')]:
+                f_high = False if lyr[0] == 1 else False
+                if lyr[0] in layertbl[id]:
+                    sanim = int_insert(sanim, lyr[1], id + f_high, 2)
+                    namel += lyr[2]
+                else:
+                    namel += "-"
+                    
+            sname = "{} {}  ".format(hex(id)[2:].rjust(3,' '), namel)
+            if sid <= 64: sname = sname[1:3] + sname[4:9]
+            elif sid <= (64+35): sname = sname[:8]
+            sanims += sanim
+            snames += sname.translate(TO_BATTLETEXT)
+            spells += spell_base
     
     data = byte_insert(data, 0x107FB2, sanims, end=0x1097FF)
     data = byte_insert(data, 0x26F567, snames, end=0x26FE8E)
@@ -1535,7 +1874,7 @@ def dothething():
     print
     print "Options: (lowercase)"
     print "  b - create battle music progression"
-    # c - randomize character names, sprites, and portraits
+    print "  c - randomize character names, sprites, and portraits (portraits NYI)"
     # g - script edits reflecting characters' randomized identities
     print "  n - convert oldcharname to class, and other tiny misc NaO flavored fixes"
     print "  m - music randomizer"
@@ -1596,6 +1935,9 @@ def dothething():
         if 'b' in modes:
             data = process_formation_music(data, 'NOFIELDSHUFFLE' not in modes)
     
+    if 'c' in modes:
+        data = process_sprite_imports(data)
+        
     if 'p' in modes:
         #data = process_actor_events(data)
         data = process_char_palettes(data, 'DISNEY' in modes, 'GLOWSTICKS' in modes)

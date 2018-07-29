@@ -54,7 +54,19 @@ Song conversions:
     MetroidQuest -- ff4_baron, ff4_boss, ff4_cave
                     ff5_bridge
     Royaken -- ff4_bomb, ff4_mysidia, ff4_whale
-               ff7_hurry2, ff7_judgment*, ff7_materia, ff7_planet
+               ff7_hurry2, ff7_judgment, ff7_materia, ff7_planet
                ff8_heresy
                ff9_messenger
                ffx_ambition
+Sprites:
+    Palettes and other adjustments for randomization - CtrlxZ, emberling
+    Original sprites: Madsiur, Gi Nattak, Ameratsu, Arodrick, Astaroth,
+        Billygo4t, Badass, Brun, Bryan120608, Christian, crumpledmedal, Cyprus,
+        Djinn, Dr Blank, Druidx, Eddielee, Feok, FF6fanatic, fffanatic,
+        fnrrfygmschnish, foxhoundmember9999, Funkydiscogod, gilgamesh,
+        MetroidQuest, mickichiba, onereaver, philaharmic, Poco Loco, rjenyawd,
+        Royaken, sapprentice, sathka, scarabenigma, silvermaine, sutebenukun,
+        thorieboy, timbo, tinman, turbotastic, unklmnky, vyperbyte,
+        wolfokami321, xeblon, xolardark, zeemis, zozma, jameswhite89,
+        kugawattan, unknown
+            (will try to sort out who did what in a future release)

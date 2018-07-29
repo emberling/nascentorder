@@ -1,0 +1,215 @@
+[Characters]
+0: Witch, female, full, caster, -old 
+1: Hunter, any, full, , -child 
+2: Knight, any, full, warrior, -child -youth 
+3: Ronin, any, full, , 
+4: Queen, female, full, noble, -child -creature -demihuman
+5: Bear, female, full, warrior, -child -caster -creature -demihuman
+6: Genrl., female, full, , -child
+7: Sage, male, full, caster, -child -youth
+8: Artist, any, full, caster, -adult -old
+9: Pilot, any, full, , 
+A: Moogle, any, full, , +clonable
+B: Feral, any, full, , -tech -armored -old -adult
+C: Enigma, any, full, cursed, 
+D: Beast, any, full, , +clonable -mascot -caster
+E: Soldier, any, full, warrior, +clonable -creature
+F: Imp, neutral, full, cursed, -human -warrior -armored -tech
+
+[Sprites]
+# name: gender, sheet size, filename without suffix, character name (for preventing duplicates), tags
+# portrait filename expected is *filename*-P.bin, *filename*-P.pal, *filename*-P.key
+Aerith: female, full, Aerith, , human youth caster,
+Arvis: male, full, Arvis, , human old,
+Marilith: female, full, astaroth-ff1-marilith, , demihuman adult,
+Dark Elf: neutral, full, astaroth-ff4-dark-elf, , demihuman clonable,
+Dr. Lugae: male, full, astaroth-ff4-dr-lugae, , human old caster,
+Rosa EX: female, full, astaroth-ff4-rosa, Rosa, human caster noble,
+Scarmiglione: neutral, full, astaroth-ff4-scarmiglione, , caster clonable,
+Rosa TAY: female, full, astaroth-ff4-tay-rosa, Rosa, human caster noble,
+Vanille: female, full, astaroth-ff13-vanille, , human youth,
+Jihl Nabaat: female, full, astaroth-other-jihl-nabaat, , human noble,
+Atma: neutral, full, Atma, , clonable creature,
+Auron: male, full, Auron, , human,
+Ayla: female, full, Ayla, , human warrior,
+Baby: neutral, full, Baby, , , +cursed
+Barret: male, full, Barret, , human tech,
+Bartz: male, full, Bartz, , human youth,
+Batman: male, full, Batman, , human clonable, -caster
+Beatrix: female, full, Beatrix, , human warrior,
+Berserker: male, full, Berserker, , human warrior clonable, -caster
+Bird: neutral, full, Bird, , creature clonable mascot,
+Black Mage: neutral, full, BlackMage, , caster clonable,
+Ryu: male, full, BoFRyu, , human warrior,
+Bomb: neutral, full, Bomb, , creature clonable,
+Bowser: male, full, Bowser, Bowser, demihuman adult,
+Bowser Jr.: male, full, BowserJr, Bowser, demihuman child,
+FF6 Boy: male, full, Boy, , human child,
+Lorial: female, full, brun-ff6-lorial, , human caster,
+Bub: neutral, full, BubbleDragon, , creature clonable,
+Bug: neutral, full, Bug, , creature clonable, +cursed
+Byuu: male, full, Byuu, , human youth,
+Cat: neutral, full, Cat, , creature clonable mascot,
+Chancellor: male, full, Chancellor, , human clonable noble,
+Chocobo: neutral, full, Chocobo, , creature clonable mascot,
+Chupon: neutral, full, Chupon, , creature clonable,
+Cid VI: male, full, Cid, , human adult clonable,
+Cid IV: male, full, Cid4, , human adult clonable tech,
+Cid VII: male, full, Cid7, , human tech,
+Clock: neutral, full, Clock, , creature clonable mascot,
+Cloud: male, full, Cloud, , human,
+Clyde: male, full, Clyde, , human adult,
+Crono: male, full, Crono, , human youth warrior, -caster
+Wolf Dog: neutral, full, crumpledmedal-other-wolf-dog-hunter, , creature clonable,
+Cucco: neutral, full, Cucco, , creature clonable mascot, 
+Cultist: neutral, full, Cultist, , human clonable,
+Cyrus: male, full, Cyrus, , human clonable warrior armored adult, -caster
+FF6 Dancer: female, full, Dancer, , human,
+Daryl: female, full, Daryl, , human,
+Dekar: male, full, Dekar, , human warrior, -caster
+Delita: male, full, Delita, , human,
+Dion: male, full, Dion, , human youth,
+Cecil (dark knight): male, full, DKCecil, , human clonable warrior armored adult, -caster
+Dogstahl: neutral, full, Dogstahl, Gestahl, demihuman clonable noble adult,
+FF6 Dragon: neutral, full, Dragon, , creature clonable,
+Dragoon: male, full, Dragoon, , human clonable warrior armored adult, -caster
+Angel: female, full, druidx-other-angel-trans, , demihuman youth,
+Edge: male, full, Edge, , human warrior adult,
+Edward: male, full, Edward, , human noble,
+Eiko: female, full, Eiko, , demihuman child, -warrior
+Esper Elder: male, full, Elder, , demihuman adult,
+Elena: female, full, Elena, , human adult, -rogue
+Fairy: female, full, Fairy, , demihuman clonable, -warrior
+Falco: neutral, full, Falco, , demihuman clonable,
+Fang: female, full, Fang, , human,
+Faris: neutral, full, Faris, , human youth noble rogue,
+Alena: female, full, feok-dq-alena, , human youth noble rogue,
+Bianca: female, full, feok-dq-bianca, , human,
+Debora: female, full, feok-dq-debora, , human noble,
+Meena: female, full, feok-dq-meena, , human caster, -warrior
+Nera: female, full, feok-dq-nera, , human child,
+Asellus: female, full, feok-other-asellus-mystic, , human noble youth,
+White Rose: female, full, feok-other-white-rose, , human youth, -warrior
+Katarina: female, full, feok-rs3-katarina, , human noble rogue,
+Figaro Guard: neutral, full, FigaroGuard, , human warrior clonable,
+Fish: neutral, full, Fish, , creature clonable mascot, +cursed
+Frog: neutral, full, Frog, , demihuman warrior clonable, -caster
+Froggy: neutral, full, Froggy, , creature clonable mascot,
+FuSoYa: male, full, FuSoYa, , human old caster,
+Gabranth: neutral, full, Gabranth, , human warrior clonable armored adult, -caster
+Gafgarion: male, full, Gaffgarion, , human warrior armored adult clonable, -caster
+Gau (suit): male, full, GauSuit, Gau, human rogue youth, -noble
+Geno: male, full, Geno, , demihuman clonable youth,
+Gestahl: male, full, Gestahl, , human old noble,
+Gilgamesh: male, full, Gilgamesh, , human adult warrior armored clonable, -caster
+FF6 Girl: female, full, Girl, , human child,
+Goku: male, full, Goku, , human warrior,
+Golbez: neutral, full, Golbez, , human armored warrior caster adult clonable,
+Grandma: female, full, Grandma, , human old noble,
+Holy Dragoon: male, full, Holy Dragoon, , human warrior armored adult,
+Hope: male, full, Hope, , human child,
+Impresario: male, full, Impressario, , human noble old, -rogue
+Interceptor: neutral, full, Interceptor, , creature clonable,
+Gau (FF6e): male, full, jameswhite89-ff6e-gau, Gau, human rogue youth, -noble
+Locke (FF6e): male, full, jameswhite89-ff6e-locke, Locke, human rogue,
+Merchant (FF6e): neutral, full, jameswhite89-ff6e-merchant, Merchant, human clonable, -warrior
+Mog (FF6e): neutral, full, jameswhite89-ff6e-mog, , creature clonable mascot,
+Hunter: male, full, jameswhite89-ff-hunter, , human rogue,
+Arcane Mage: neutral, full, jameswhite89-other-arcane-mage, , clonable caster,
+Johnny: male, full, Johnny, , tech demihuman,
+Kain: male, full, Kain, , human warrior armored adult, -caster
+Kappa: neutral, full, Kappa, , creature clonable mascot,
+Katarin: female, full, Katarin, , human youth,
+Kelgar: neutral, full, Kelgar, , demihuman clonable,
+Kiki: neutral, full, Kiki, , creature mascot clonable,
+Kirby: neutral, full, Kirby, , creature mascot clonable,
+Terra EX: female, full, kugawattan-ff6-terra, Terra, human youth,
+Athena: neutral, full, kugawattan-other-athena, , human rogue clonable,
+FF6 Lady: female, full, Lady, , human noble,
+Lenna: female, full, Lenna, , human youth,
+Lightning: female, full, Lightning, , human noble,
+Link: male, full, Link, , human rogue youth,
+Lone Wolf: neutral, full, LoneWolf, , demihuman clonable,
+Child Link: male, full, LTTP, , human rogue child,
+Lucca: female, full, Lucca, , human tech youth,
+Maduin: male, full, Maduin, , demihuman adult,
+Magus: male, full, Magus, , human demihuman adult caster,
+Mallow: male, full, Mallow, , creature mascot clonable,
+FF6 Man: male, full, Man, , human adult,
+Mario: male, full, Mario, , human adult,
+Marle: female, full, Marle, , human youth,
+Matoya: female, full, Matoya, , human old caster clonable, -warrior
+Maxim: male, full, Maxim, , human warrior,
+Mega Man X: male, full, MegaMan, , human demihuman tech armored clonable,
+Mini: neutral, full, Mini, , clonable, +cursed
+Mr. Saturn: male, full, MrSaturn, , clonable adult mascot creature,
+Ness: male, full, Ness, , human child caster,
+Noctis: male, full, Noctis, , human youth noble,
+FF6 Old Man: male, full, OldMan, , human old noble, -warrior
+Onion Knight: male, full, OnionKnight, , human child warrior armored clonable,
+Opera Celes: female, full, OperaCeles, Celes, human noble,
+Cid Orlandu: male, full, Orlandu, , human old,
+Cecil (paladin): male, full, PaladinCecil, , human warrior noble adult,
+Peach: female, full, Peach, , human noble youth, -warrior
+Pig: neutral, full, Pig, , creature clonable mascot,
+Evonne: female, full, pocoloco-other-evonne, , human noble rogue,
+Terry: male, full, pocoloco-other-terry, , human rogue youth,
+Potato: neutral, full, Potato, , , +cursed
+Rachel: female, full, Rachel, , human noble,
+Ramza: male, full, Ramza, , human warrior youth, -caster
+Red: male, full, Red, , human child,
+Red Mage: neutral, full, RedMage, , human noble rogue clonable,
+Relm (adult): female, full, RelmAdult, , human youth noble,
+Reno: male, full, Reno, , human rogue,
+Pikachu: neutral, full, RetroPikachu, , creature clonable mascot,
+Returner: male, full, Returner, , clonable human,
+Rinoa: female, full, Rinoa, , human youth,
+Robo: neutral, full, Robo, , demihuman creature clonable, -caster
+Rosa: female, full, Rosa, Rosa, human noble,
+Rude: male, full, Rude, , human adult clonable,
+Rydia: female, full, Rydia, Rydia, human youth caster noble,
+Rydia (child): female, full, RydiaChild, Rydia, human child, -warrior
+Samus (armored): neutral, full, Samus, Samus, human demihuman armored tech clonable, -caster
+Samus (zero): female, full, SamusZero, Samus, human warrior,
+Refia (black belt): female, full, scarabenigma-ff-blackbelt-refia, Refia, human noble,
+Refia (monk): female, full, scarabenigma-ff-monk-refia, Refia, human youth,
+Aisha: female, full, scarabenigma-rs-aisha, , human youth, -warrior
+FF6 Scholar: male, full, Scholar, , human noble adult,
+Seifer: male, full, Seifer, , human noble youth warrior,
+Sephiroth: male, full, Sephiroth, , human,
+FF6 Shopkeeper: male, full, Shopkeeper, , human old,
+Siegfried: male, full, Siegfried, , human clonable rogue armored warrior, -caster
+Sion: male, full, Sion, , human youth warrior, -caster
+Slash: male, full, Slash, , human adult clonable warrior armored, -caster
+Snow: male, full, Snow, , human rogue warrior,
+Evermore Boy: male, full, SoEBoy, , human child,
+Sonic: neutral, full, Sonic, , demihuman clonable youth,
+Squall: male, full, Squall, , human youth,
+Steiner: male, full, Steiner, , human adult warrior armored clonable, -caster
+Ronin: female, full, sutebenukun-other-ronin, , human noble,
+Tellah: male, full, Tellah, , old human caster, -warrior
+FF6 Thief: male, full, Thief, , human rogue clonable, -noble
+Tidus: male, full, Tidus, , human youth,
+Tifa: female, full, Tifa, , human youth warrior,
+Tiny Moogle: neutral, full, TinyMoogle, , creature clonable mascot,
+Conductor: male, full, TrainConductor, , human clonable adult,
+Wolfman Locke: neutral, full, turbotastic-ff6-wolfman-locke, , demihuman clonable rogue,
+Turtle: neutral, full, Turtle, , creature clonable mascot,
+Ultros: neutral, full, Ultros, , creature clonable,
+Iris: female, full, unknown-ff6-iris-beta, , human warrior armored clonable,
+Vaan: male, full, Vaan, , human youth rogue,
+Darth Vader: male, full, Vader, , human armored clonable tech,
+Valkyrie: female, full, Valkyrie, , human warrior clonable, -rogue
+Vargas: male, full, Vargas, , human warrior, -caster -noble
+Vincent: male, full, Vincent, , human rogue,
+Vivi: neutral, full, Vivi, , clonable caster child, -warrior
+Vomammoth: neutral, full, Vomammoth, , creature clonable,
+Warrior of Light: male, full, WarriorOfLight, , human armored warrior adult,
+White Mage: neutral, full, WhiteMage, , human caster faceless, -warrior -rogue
+Yang: male, full, Yang, , human warrior adult,
+Yoshi: neutral, full, Yoshi, , creature clonable mascot,
+Yuffie: female, full, Yuffie, , human youth warrior rogue,
+Yuna: female, full, Yuna, , human youth noble caster, -warrior
+Yura: male, full, Yura, , human demihuman warrior adult,
+Zack: male, full, Zack, , human warrior youth,
+Zidane: male, full, Zidane, , human demihuman youth rogue,
