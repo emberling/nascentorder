@@ -11,9 +11,11 @@
 [Imports]
 #custom songs
 cc_arni:        gau, relm, town, prelude
+cc_dragonia:    omen3, train, espers, zozo, magitek, fanatics, kefkastower
 cc_flame:       I75, G95, kefka, metamorphosis, grandfinale, catastrophe, floatingcont, fanatics, kefkastower
 cc_miguel:      prelude, awakening, gau, rachel, gestahl, train, grandfinale, ruin, fanatics, omen3
-ct_boss2:       I90, G60, savethem, metamorphosis, grandfinale, catastrophe, floatingcont, kefkastower
+ct_boss2:       I90, G60, savethem, metamorphosis, grandfinale, catastrophe
+ct_theme:       I75, G70, prelude, locke, setzer, savethem, grandfinale, falcon
 ds4_lyll:       I30, G40, prelude, cyan, locke, setzer, chocobo, savethem, grandfinale, mountain, serpent, unforgiven, floatingcont, falcon
 ff1_battle:     I15, G00, grandfinale, unforgiven
 ff1_dungeon:    I60, G35, metamorphosis, grandfinale, unforgiven*2, kefkastower
