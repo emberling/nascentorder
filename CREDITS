@@ -12,9 +12,11 @@ docs on ff6hacking.com
 
 MEDIA INCLUDED:
 Song conversions:
-    emberling -- ff5_ahead
-                 ffmq_battle1, ffmq_boss, ffmq_forest, ffmq_fossil, ffmq_rock,
-                 ffmq_roll, ffmq_tower
+    emberling -- cc_dragonia
+                 ct_theme
+                 ff5_ahead
+                 ffmq_battle1, ffmq_boss, ffmq_forest, ffmq_fossil, ffmq_lava,
+                 ffmq_light, ffmq_rock, ffmq_roll, ffmq_tower, ffmq_victory
                  ds4_lyll
                  lu2_battle
                  sd2_8bells, sd2_always, sd2_angel, sd2_city, sd2_desert,
@@ -24,8 +26,10 @@ Song conversions:
                  sd2_prayer, sd2_prophecy, sd2_scorpion, sd2_sea, sd2_spirit,
                  sd2_star, sd2_steel, sd2_tasnica, sd2_thanatos, sd2_thunder,
                  sd2_tomorrow, sd2_town, sd2_wish
+                 top_world3
     Gi Nattak -- cc_arni, cc_flame, cc_miguel
                  ct_boss2
+                 evo_boss
                  ff1_battle, ff1_dungeon
                  ff3_darkworld, ff3_eureka
                  ff4_airship, ff4_babil, ff4_golbez, ff4_longway,

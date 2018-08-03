@@ -1,8 +1,10 @@
-VERSION = "DEV 0.1.1"
+VERSION = "DEV 0.2.0"
 DEBUG = True
 import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib, re, csv
 from copy import copy
 from string import maketrans
+
+from mml2mfvi import mml_to_akao
 
 HIROM = 0xC00000
 defaultmode = 'bmx'
@@ -302,10 +304,15 @@ def process_misc_fixes(data_in):
                 "Sage", "Artist", "Pilot", "Moogle", "Feral", "Enigma", "Beast"]
         charcfg = ConfigParser.ConfigParser()
         charcfg.read(os.path.join("custom", "SpriteImports.txt"))
-        charcfg = charcfg.items("Characters")
-        for i, c in enumerate(classes):
-            if hex(i)[2:] in charcfg:
-                classes[i] = charcfg[hex(i)[2:].split(',')[0].strip()]
+        for k, v in charcfg.items("Characters"):
+            try:
+                if int(k, 16) < len(classes):
+                    classes[int(k,16)] = v.split(',')[0].strip()
+            except:
+                pass
+        #for i, c in enumerate(classes):
+        #    if hex(i)[2:] in charcfg:
+        #        classes[i] = charcfg[hex(i)[2:].split(',')[0].strip()]
         for i, c in enumerate(classes):
             classdata = byte_insert(classdata, i*8, classes[i].translate(TO_BATTLETEXT), 6)
         data = byte_insert(data, loc, classdata, end=o_end)
@@ -396,6 +403,11 @@ def process_sprite_imports(data_in):
         if 'Characters' not in spoiler: spoiler['Characters'] = []
         spoiler['Characters'].append(txt)
     
+    sizedb = {
+        "full": l_fullsprite,
+        "nr": l_fullsprite - 320
+        }
+        
     # parse config into actorlist & spritelist
     allactors, allsprites = [], []
     for k, v in spritecfg.items("Characters"):
@@ -434,14 +446,19 @@ def process_sprite_imports(data_in):
                 initials_used.add(a.name[0])
             #check filesize (nyi, everything is full size atm)
             thissprite = rng.choice(spriteopts)
-            
+            try:
+                size = sizedb[a.size]
+            except ValueError:
+                print "WARNING: actor {} has invalid size {}. Cannot make sprite changes past this point."
+                retry = False
+                break
             #read image data
             # (portrait goes here)
             filename = os.path.join("sprites", thissprite.file + ".bin")
             try:
                 with open(filename, "rb") as sf:
                     sdata = sf.read()
-                if len(sdata) < l_fullsprite: raise IOError
+                if len(sdata) < size: raise IOError
             except IOError:
                 print "WARNING: invalid spritesheet {}. Rerolling sprites...".format(filename)
                 retry = True
@@ -452,8 +469,8 @@ def process_sprite_imports(data_in):
                 while len(romname) < 6: romname = romname + "\xFF"
                 if len(romname) > 6: romname = romname[:6]
                 data = byte_insert(data, o_charnames + 6*int(a.id, 16), romname, 6)
-            data = byte_insert(data, spritepos, sdata, l_fullsprite)
-            spritepos += l_fullsprite
+            data = byte_insert(data, spritepos, sdata, size)
+            spritepos += size
             if hasattr(a, 'name'):
                 spoilertxt.append("{} ({}) -> {} ({})".format(id, a.desc, a.name, thissprite.name))
             else:
@@ -468,6 +485,8 @@ def process_sprite_imports(data_in):
     for line in spoilertxt:
         spoil(line)
     return data
+    
+    
 def process_npcdb(data_in, f_sprites=False):
     print "** Processing NPCs ..."
     global npcdb
@@ -1084,8 +1103,28 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         
         #get data now, so we can keeptrying if there's not enough space
         for ident, s in songtable.items():
+            # case: get song from MML
+            if os.path.isfile(os.path.join("music", s.changeto + ".mml")):
+                try:
+                    with open(os.path.join("music", s.changeto + ".mml"), 'r') as mmlf:
+                        mml = mmlf.read()
+                except:
+                    print "couldn't open {}.mml".format(s.changeto)
+                    keeptrying = True
+                    break
+                akao = mml_to_akao(mml, s.changeto + ".mml")
+                s.data = akao['_default_'][0]
+                s.inst = akao['_default_'][1]
+                s.is_pointer = False
+                if max(map(ord, s.inst)) > instcount:
+                    if 'nopatch' in akao:
+                        s.inst = akao['nopatch'][1]
+                        s.data = akao['nopatch'][0]
+                    else:
+                        print "WARNING: instrument out of range in {}".format(s.changeto + ".mml")
+                        
             # case: get song from source ROM
-            if not os.path.isfile(os.path.join("music", s.changeto + "_data.bin")):
+            elif not os.path.isfile(os.path.join("music", s.changeto + "_data.bin")):
                 target = s.changeto[len(native_prefix):]
                 if (s.changeto[:len(native_prefix)] == native_prefix and
                         target in songtable):
@@ -1775,6 +1814,10 @@ def dothething():
     lastcfg = ConfigParser.ConfigParser(DEFAULT_DEFAULTS)
     lastcfg.read('lastused.cfg')
     
+    def reseed(seed):
+        rng.seed(seed+1)
+        return seed+1
+        
     print "Nascent Order supplemental randomizer for Final Fantasy VI by emberling"
     print "version {}".format(VERSION)
     print
@@ -1833,6 +1876,7 @@ def dothething():
     print
     rng.seed(seed)
     random = rng
+    vseed = seed
     
     # detect known romhacks
     hackconfig = ConfigParser.ConfigParser()
@@ -1930,30 +1974,37 @@ def dothething():
         global f_tellmewhy
         f_tellmewhy = True
         
+    vseed = reseed(vseed)
     if 'm' in modes or 'b' in modes:
         data = process_custom_music(data, 'm' in modes, 'b' in modes, 'MUSICCHAOS' in modes, 'ALTSONGLIST' in modes)
         if 'b' in modes:
             data = process_formation_music(data, 'NOFIELDSHUFFLE' not in modes)
     
+    vseed = reseed(vseed)
     if 'c' in modes:
         data = process_sprite_imports(data)
         
+    vseed = reseed(vseed)
     if 'p' in modes:
         #data = process_actor_events(data)
         data = process_char_palettes(data, 'DISNEY' in modes, 'GLOWSTICKS' in modes)
         if 'MESSMEUP' not in modes:
             data = process_sprite_fixes(data)
             
+    vseed = reseed(vseed)
     if 'x' in modes:
         data = process_sprite_portraits(data, 'GENERALSTORE' in modes, 'PIXELPARTY' in modes)
     
+    vseed = reseed(vseed)
     if 'p' in modes:
         data = process_actor_events(data)
         data = process_npcdb(data)
         
+    vseed = reseed(vseed)
     if 'n' in modes:
         data = process_misc_fixes(data)
         
+    vseed = reseed(vseed)
     if 'MANGLEMAGIC' in modes:
         data = mangle_magic(data)
         

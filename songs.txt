@@ -17,6 +17,7 @@ cc_miguel:      prelude, awakening, gau, rachel, gestahl, train, grandfinale, ru
 ct_boss2:       I90, G60, savethem, metamorphosis, grandfinale, catastrophe
 ct_theme:       I75, G70, prelude, locke, setzer, savethem, grandfinale, falcon
 ds4_lyll:       I30, G40, prelude, cyan, locke, setzer, chocobo, savethem, grandfinale, mountain, serpent, unforgiven, floatingcont, falcon
+evo_boss:       I85, G40, boss, atma
 ff1_battle:     I15, G00, grandfinale, unforgiven
 ff1_dungeon:    I60, G35, metamorphosis, grandfinale, unforgiven*2, kefkastower
 ff3_darkworld:  locke, setzer, chocobo, veldt, mountain, fanatics
@@ -72,9 +73,12 @@ ffmq_boss:      I85, G80, magitek, metamorphosis, floatingcont, kefkastower, bos
 ffmq_forest:    awakening, shadow, narshe, forest, martiallaw, mountain, serpent, town_ruin, ruin, omen3
 ffmq_fossil:    I30, G50, figaro, cyan, troops, umaro, floatingcont, kefkastower
 ffmq_gale:      I25, G90, locke, savethem, grandfinale, mountain, returners, umaro, catastrophe, floatingcont, kefkastower, fanfare, battle
+ffmq_lava:      I65, G70, boss, magitek, floatingcont
+ffmq_light:     prelude, awakening, relm, town
 ffmq_rock:      I20, G05, setzer, chocobo, johnny, zozo, prelude*4, battle
 ffmq_roll:      locke, setzer, chocobo, johnny, grandfinale, gogo, moogles
 ffmq_tower:     I55, G70, cyan, savethem, troops, umaro, floatingcont, kefkastower, catastrophe, omen3
+ffmq_victory:   fanfare
 iog_boss:       I90, G55, metamorphosis, grandfinale, unforgiven*2
 lu1_boss:       I65, G50, savethem, metamorphosis, catastrophe, magitek, floatingcont, kefkastower, boss
 lu2_battle:     I30, G20, unforgiven, magitek, battle, boss
@@ -126,6 +130,7 @@ sdnt_courage:   I65, G90, savethem*2, locke, setzer, grandfinale, metamorphosis,
 sdnt_fate:      rachel, daryl, celes, town_ruin, omen3
 sdnt_field:     I50, G85, balance, figaro, setzer, grandfinale, mountain, returners, fanfare, blackjack, falcon*2, battle, boss
 sdnt_risingsun: prelude, awakening, relm, celes, forest, town, omen3
+top_world3:     I50, G70, setzer, chocobo, johnny, floatingcont, falcon, magitek
 xg_chuchu:      prelude, gau, relm, grandfinale, what, gogo, moogles, spinachrag
 xg_mermaid:     shadow, coin, rachel, daryl, celes, forest, espers, town_ruin, ruin, omen3
 zaol_overworld: prelude, figaro, locke, setzer, troops, grandfinale, returners
