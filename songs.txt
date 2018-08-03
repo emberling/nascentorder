@@ -58,8 +58,8 @@ ff7_tifa:       prelude, awakening, relm, town_ruin
 ff8_heresy:     kefka, gestahl*2, grandfinale, catastrophe, fanatics
 ff8_laguna:     I80, G30, chocobo, johnny, magitek, kefkastower, atma, boss, battle
 ff8_oath:       rachel, ruin, omen3
-ff9_blackmage:  strago, gogo, magitek
-ff9_blackwaltz: kefka, gestahl, catastrophe, fanatics, ruin, what
+ff9_blackmage:  strago, gogo, magitek, what
+ff9_blackwaltz: kefka, gestahl, catastrophe, fanatics, ruin
 ff9_dali:       relm, town, town_ruin
 ff9_eiko:       gau, daryl, town_ruin
 ff9_home:       prelude*2, awakening, relm, rachel, daryl, grandfinale, town_ruin, omen3
