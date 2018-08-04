@@ -34,7 +34,7 @@ ff4_mysidia:    strago, what, gogo, umaro, moogles, owzer
 ff4_overworld:  prelude, awakening, locke, setzer, celes, forest, veldt, mountain, serpent, falcon
 ff4_prologue:   prelude, fanfare, grandfinale, returners, omen3
 ff4_redwings:   prelude, figaro, troops, returners, kefka
-ff4_restless:   I70, G25, savethem, umaro, magitek, floatingcont, kefkastower, boss
+ff4_restless:   I85, G15, savethem, umaro, magitek, floatingcont, kefkastower, boss
 ff4_somewhere:  gestahl, train, town_ruin, ruin, omen3
 ff4_sorrow:     prelude, coin, train, ruin
 ff4_town:       prelude, town
@@ -50,13 +50,13 @@ ff5_world2:     prelude, awakening, balance, daryl, celes, narshe, forest, esper
 ff6_town2:      relm, martiallaw, town, moogles, spinachrag
 ff7_5years:     shadow, narshe, forest, gestahl*2, town_ruin, ruin*2, omen3
 ff7_costa:      prelude, gau, setzer, veldt, martiallaw, zozo, spinachrag
-ff7_hurry2:     I35, G35, savethem, grandfinale, gogo, umaro, unforgiven, metamorphosis, floatingcont, battle
+ff7_hurry2:     I70, G10, savethem, grandfinale, gogo, umaro, unforgiven, metamorphosis, floatingcont, battle
 ff7_judgment:   I00, G99, troops, mountain, gogo, umaro, catastrophe, floatingcont, fanatics, kefkastower, omen3
 ff7_materia:    shadow, strago, gau, relm, kefka, grandfinale, zozo, gogo, umaro, moogles, owzer
 ff7_temple:     shadow, strago, rachel, daryl, forest, train, espers, town_ruin, ruin
 ff7_tifa:       prelude, awakening, relm, town_ruin
 ff8_heresy:     kefka, gestahl*2, grandfinale, catastrophe, fanatics
-ff8_laguna:     I80, G30, chocobo, johnny, magitek, kefkastower, atma, boss, battle
+ff8_laguna:     I90, G20, chocobo, johnny, magitek, kefkastower, atma, boss, battle
 ff8_oath:       rachel, ruin, omen3
 ff9_blackmage:  strago, gogo, magitek, what
 ff9_blackwaltz: kefka, gestahl, catastrophe, fanatics, ruin
@@ -158,7 +158,7 @@ ff6_kefka:      kefka*3, grandfinale, what, gogo, fanatics, kefkastower, omen3
 ff6_narshe:     narshe*2, awakening, shadow, gestahl, train, zozo, town_ruin, ruin, omen3
 ff6_forest:     forest*2, shadow, gau, narshe, train, espers, ruin, omen3
 ff6_veldt:      veldt*3, gau, chocobo, johnny, mountain, gogo, umaro
-ff6_savethem:   I50, G25, savethem*2, locke, metamorphosis, grandfinale
+ff6_savethem:   I60, G25, savethem*2, locke, metamorphosis, grandfinale
 ff6_gestahl:    gestahl*2, town_ruin, ruin, fanatics, omen3*4
 ff6_troops:     troops, martiallaw, returners, omen3
 ff6_martiallaw: martiallaw*2, shadow, celes, narshe, zozo, town_ruin, omen3
@@ -178,7 +178,7 @@ ff6_returners:  returners, figaro, cyan, troops, martiallaw, grandfinale, umaro,
 ff6_fanfare:    fanfare*8, fanfareslow
 ff6_umaro:      umaro, shadow, strago, gau, veldt, grandfinale, what, gogo, moogles, owzer, fanatics
 ff6_moogles:    moogles*4, strago, grandfinale, what, gogo
-ff6_unforgiven: I40, G10, unforgiven*2, metamorphosis, grandfinale, boss
+ff6_unforgiven: I65, G15, unforgiven*2, metamorphosis, grandfinale, boss
 ff6_atma:       I99, G90, metamorphosis, unforgiven, magitek, floatingcont, kefkastower, atma
 ff6_town_ruin:  town_ruin*4, awakening, shadow, strago, gau, narshe, martiallaw, zozo, gogo, omen3
 ff6_blackjack:  blackjack*2, figaro, setzer, chocobo, grandfinale, falcon

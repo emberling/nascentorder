@@ -52,6 +52,7 @@ DEFAULT_DEFAULTS = {
         'lastfile': 'ff6.smc'
         }
         
+FLAGS = set()
 spoiler = {}
 f_tellmewhy = False
 npcdb = {}
@@ -1008,10 +1009,6 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         
         # what this is trying to do is:
         # we judge songs by pure INTENSITY or by combined INTENSITY and GRANDEUR
-        # old method:
-        # the lowest combined rating song is our first battle music
-        # the highest combined rating song is our last boss music
-        # remaining songs are separated by pure intensity into battle and boss
         # new method: all songs separated by pure intensity into battle and boss
         # within these categories they are set in combined rating order
         battlecount = len(battleids) + len(bossids)
@@ -1327,15 +1324,17 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
     
 def process_formation_music(data, f_shufflefield):
     print "** Processing progressive battle music ..."
-    isetlocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'instruments').split(',')]
-    if len(isetlocs) != 2: isetlocs = to_default('instruments')
-    songdatalocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'songdata').split(',')]
-    starts = songdatalocs[::2]
-    ends = songdatalocs[1::2]
-    if len(ends) < len(starts): ends.append(0x3FFFFF)
-    songdatalocs = zip(starts, ends)
-    native_prefix = "ff6_"
-    isetsize = 0x20
+    
+    o_mpacks = 0xF4800
+    o_mzones = 0xF5400
+    
+    formlocs = [int(s.strip(),16) for s in CONFIG.get('EnemyPtr', 'forms_loc').split(',')]
+    if len(formlocs) != 2: formlocs = to_default('forms_loc')
+    formsize = int(CONFIG.get('EnemyPtr', 'forms_size'), 16)
+    auxlocs = [int(s.strip(),16) for s in CONFIG.get('EnemyPtr', 'forms_aux').split(',')]
+    if len(auxlocs) != 2: auxlocs = to_default('forms_aux')
+    auxsize = int(CONFIG.get('EnemyPtr', 'forms_aux_size'), 16)
+    auxdata = data[auxlocs[0]:auxlocs[1]+1]
     
     # build table of monster levels
     monsterlocs = [int(s.strip(),16) for s in CONFIG.get('EnemyPtr', 'monsters_loc').split(',')]
@@ -1349,10 +1348,6 @@ def process_formation_music(data, f_shufflefield):
         monsterlevels.append(ord(data[levelloc]))
         
     # build table of average levels within formations
-    formlocs = [int(s.strip(),16) for s in CONFIG.get('EnemyPtr', 'forms_loc').split(',')]
-    if len(formlocs) != 2: formlocs = to_default('forms_loc')
-    formsize = int(CONFIG.get('EnemyPtr', 'forms_size'), 16)
-    
     formcount = (formlocs[1] + 1 - formlocs[0]) / formsize
     formlevels = []
     forms = [] #debug
@@ -1369,33 +1364,127 @@ def process_formation_music(data, f_shufflefield):
         else:
             formlevels.append(0)
         forms.append(map(ord, form)) #debug
-                
+
+    f_bylevel = True
+    if 'battlebylevel' not in FLAGS:
+        f_bylevel = False
+        ##### new progression, by location
+        pack_map = {}
+        ruin_map = set()
+        try:
+            with open(os.path.join('tables', 'ruinmaps.txt'), 'r') as f:
+                ruin = f.read().split()
+        except IOError:
+            ruin = []
+        for n in ruin:
+            try:
+                ruin_map.add(int(n, 16))
+            except ValueError:
+                pass        
+        
+        #random packs
+        loc = o_mpacks
+        for i in xrange(0,256):
+            pack = []
+            for j in xrange(0,4):
+                pack.append(bytes_to_int(data[loc:loc+2]))
+                loc += 2
+            pack_map[i] = pack
+        #event packs
+        for i in xrange(256,512):
+            pack = []
+            for j in xrange(0,2):
+                pack.append(bytes_to_int(data[loc:loc+2]))
+                loc += 2
+            pack_map[i] = pack
+        
+        form_map = {}
+        form_map_d = {}
+        #set wor-inside (6)
+        loc = o_mzones + 512
+        for i in xrange(0,512):
+            if i in ruin_map:
+                pack = pack_map[bytes_to_int(data[loc])]
+                for f in pack:
+                    form_map[f] = 6
+                    if f in form_map_d:
+                        form_map_d[f].add(6)
+                    else:
+                        form_map_d[f] = {6}
+            loc += 1
+        #set wor-outside (4)
+        loc = o_mzones + 256
+        for i in xrange(0,256):
+            pack = pack_map[bytes_to_int(data[loc])]
+            for f in pack:
+                form_map[f] = 4
+                if f in form_map_d:
+                    form_map_d[f].add(4)
+                else:
+                    form_map_d[f] = {4}
+            loc += 1
+        #set event (7)
+        for i in xrange(256,512):
+            pack = pack_map[i]
+            for f in pack:
+                form_map[f] = 7
+                if f in form_map_d:
+                    form_map_d[f].add(7)
+                else:
+                    form_map_d[f] = {7}
+        #set wob-inside (3)
+        loc = o_mzones + 512
+        for i in xrange(0,512):
+            if i not in ruin_map:
+                pack = pack_map[bytes_to_int(data[loc])]
+                for f in pack:
+                    form_map[f] = 3
+                    if f in form_map_d:
+                        form_map_d[f].add(3)
+                    else:
+                        form_map_d[f] = {3}
+            loc += 1
+        #set wob-outside (0)
+        loc = o_mzones
+        for i in xrange(0,256):
+            if i % 4 == 3: continue #no blasted land in WoB
+            pack = pack_map[bytes_to_int(data[loc])]
+            for f in pack:
+                form_map[f] = 0
+                if f in form_map_d:
+                    form_map_d[f].add(0)
+                else:
+                    form_map_d[f] = {0}
+            loc += 1   
+            
     # iterate aux form data and:
     #   if music is 1, chance to change it to 2
     #   if it's 0/3/4/6/7, set according to level percentile
-    auxlocs = [int(s.strip(),16) for s in CONFIG.get('EnemyPtr', 'forms_aux').split(',')]
-    if len(monsterlocs) != 2: monsterlocs = to_default('forms_aux')
-    auxsize = int(CONFIG.get('EnemyPtr', 'forms_aux_size'), 16)
-    auxdata = data[auxlocs[0]:auxlocs[1]+1]
     formsongs = [] #debug
     for i in xrange(0, formcount):
         loc = i * auxsize + 3
         byte = ord(auxdata[loc])
         keepfield = byte >> 7
-        song = (byte >> 4) & 0b0111
+        song = (byte >> 3) & 0b111
         maxlevel = max(formlevels)
         if song == 1 and not keepfield:
             if rng.randint(0, 20 + maxlevel) < (20 + formlevels[i]):
                 song = 2
-                byte = (byte & 0b10001111) | (song << 4)
-        elif song != 5:
-            tier = maxlevel / 5
-            if formlevels[i] >= tier * 4: song = 7
-            elif formlevels[i] >= tier * 3: song = 6
-            elif formlevels[i] >= tier * 2: song = 4
-            elif formlevels[i] >= tier * 1: song = 3
-            else: song = 0
-            byte = (byte & 0b10001111) | (song << 4)
+                byte = (byte & 0b11000111) | (song << 3)
+        elif keepfield or (song not in [2, 5]):
+            if f_bylevel:
+                tier = maxlevel / 5
+                if formlevels[i] >= tier * 4: song = 7
+                elif formlevels[i] >= tier * 3: song = 6
+                elif formlevels[i] >= tier * 2: song = 4
+                elif formlevels[i] >= tier * 1: song = 3
+                else: song = 0
+            else:
+                if i in form_map:
+                    song = form_map[i]
+                else:
+                    song = 0
+            byte = (byte & 0b11000111) | (song << 3)
             if f_shufflefield:
                 fieldchance = int(CONFIG.get('Music', 'field_music_chance').strip())
                 if fieldchance > 100 or fieldchance < 0: fieldchance = to_default('field_music_chance')
@@ -1420,7 +1509,8 @@ def process_formation_music(data, f_shufflefield):
         for i in xrange(0, formcount):
             despoil()
             despoil("FORMATION {} assigned song {}".format(i, formsongs[i]))
-            despoil("contains {} :: avg {}".format(forms[i], formlevels[i]))
+            despoil("contains {} :: avg {}".format(forms[i], formlevels[i]))  
+        
     return byte_insert(data, auxlocs[0], auxdata, end=auxlocs[1])
 
 def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
@@ -1930,7 +2020,7 @@ def dothething():
     print "keywords (all caps):"
     print "  MUSICCHAOS - songs that change choose from the entire pool of available songs"
     print "  ALTSONGLIST - uses songs_alt.txt instead of songs.txt for music config"
-    print "  NOFIELDSHUFFLE - 'b' no longer changes which battles continue field music"
+    print "  ONEWINGEDLEAFER - battle music progression based on level, not area (inconsistent)"
     print "  MESSMEUP - 'p' no longer applies updates to known incompatible sprites"
     print "  DISNEY - (p) advanced state-of-the-art cel shader mode"
     print "  GLOWSTICKS - (p) trance palettes for everyone"
@@ -1973,6 +2063,9 @@ def dothething():
     if 'TELLMEWHY' in modes:
         global f_tellmewhy
         f_tellmewhy = True
+    
+    if 'ONEWINGEDLEAFER' in modes:
+        FLAGS.add("battlebylevel")
         
     vseed = reseed(vseed)
     if 'm' in modes or 'b' in modes:
