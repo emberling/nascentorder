@@ -7,23 +7,21 @@
 #VARIANT ~
 #VARIANT / nopatch
 
-                  #Sawtooth  %k11
-#WAVE 0x20: 0x0E  {Trumpet}  %k11
-#WAVE 0x21: 0x0B  {Organ}    %k11
-#WAVE~0x22: 0x43~ {Strings}  %k5 -- %k9 for harpsi-synth
-#WAVE 0x23: 0x06  {Choir}    %k0
-#WAVE 0x25: 0x1B  {Harp}     %k11
-#WAVE~0x26: 0x62~ {Celesta}  %k11
-#WAVE~0x27: 0x4A~ {Bass}     %k6
-#WAVE 0x28: 0x22  {Kick}
-#WAVE 0x29: 0x14  {Snare}
-#WAVE 0x2A: 0x0F  {Closed Hihat}
-#WAVE 0x2B: 0x12  {Cymbal}
-#WAVE~0x2C: 0x66~ {Tom}      %k4
+                          #Buzzy syn %k9
+                          #Sawtooth  %k11
+#WAVE 0x20:  0x0E         {Trumpet}  %k11
+#WAVE 0x21:  0x0B         {Organ}    %k11
+#WAVE 0x22: ~0x43~ /0x0D/ {Strings}  %k5
+#WAVE 0x23:  0x06         {Choir}    %k0
+#WAVE 0x25:  0x1B         {Harp}     %k11
+#WAVE 0x26: ~0x62~ /0x00/ {Celesta}  %k11
+#WAVE 0x27: ~0x4A~ /0x1C/ {Bass}     %k6
+#WAVE 0x28:  0x22         {Kick}
+#WAVE 0x29:  0x14         {Snare}
+#WAVE 0x2A:  0x0F         {Closed Hihat}
+#WAVE 0x2B:  0x12         {Cymbal}
+#WAVE 0x2C: ~0x66~ /0x2E/ {Tom/Conga}%k4
 
-#WAVE /0x22, 0x0D;/{Strings}
-#WAVE /0x27, 0x1C;/{Bass}
-#WAVE /0x2C, 0x2E;/{Conga}
 
 {--------------- Track 1 ---------------}
 t255%v48%x240%b00,46
