@@ -1,20 +1,64 @@
 [Characters]
-0: Witch, female, full, caster, -old 
-1: Hunter, any, full, , -child 
-2: Knight, any, full, warrior, -child -youth 
+0: Witch, female, full, caster, -old -creature
+1: Hunter, any, full, , -child -creature
+2: Knight, any, full, warrior, -child -youth -creature
 3: Ronin, any, full, , 
-4: Queen, female, full, noble, -child -creature -demihuman
-5: Bear, female, full, warrior, -child -caster -creature -demihuman
-6: Genrl., female, full, , -child
-7: Sage, male, full, caster, -child -youth
-8: Artist, any, full, caster, -adult -old
+4: Ruler, female, full, noble, -child -old -creature -demihuman
+5: Bear, female, full, warrior, -child -old -caster -creature -demihuman
+6: Genrl., female, full, , -child -creature
+7: Sage, male, full, caster, -child -youth -creature
+8: Artist, any, full, caster, -adult -old -creature
 9: Pilot, any, full, , 
-A: Moogle, any, full, , +clonable
-B: Feral, any, full, , -tech -armored -old -adult
+A: Moogle, any, full, , +clonable -human
+B: Feral, any, full, , -tech -armored -old -adult -creature
 C: Enigma, any, full, cursed, 
 D: Beast, any, full, , +clonable -mascot -caster
 E: Soldier, any, full, warrior, +clonable -creature
 F: Imp, neutral, full, cursed, -human -warrior -armored -tech
+10: Leo, male, nr, warrior, -child -youth -creature -caster
+11: Banon, male, nr, , -child -creature
+12: Trance, female, nr, , -human -mascot -child
+13: Merchant, any, nr, , +human +clonable -child -rogue
+14: Ghost, neutral, nr, caster, +clonable +caster -child
+15: Kefka, male, nr, ,-child -mascot
+16: Gestahl, male, fpbowprone, , +noble +human -clonable -child -youth
+17: Old Man, male, fpbowshock, , +human +old -tech -armored -warrior
+18: Young Man, male, fpbowshock, , +human -child -old -tech -armored -warrior
+1A: Maria, female, singpray, noble, +human -child -old -clonable -tech -armored -warrior
+1B: Ralse, male, singprone, noble, +human -child -old -tech
+1C: Draco, male, singprone, warrior, +human -child -old -clonable
+1D: Arvis, male, bow, , +human -child -youth
+1E: Returner, any, prone, warrior, +human +clonable -child
+1F: Ultros, any, shock, , +creature -mascot
+20: Gau Suit, neutral, walk, , +human -old -adult -rogue
+21: Dancer, female, flirt, , +human -child -adult -old -rogue -armored -tech -warrior
+22: Chancellor, any, shock, noble, +human -child
+23: Clyde, any, sideeye, rogue, +human -child -old
+24: Old Woman, female, shock, , +human +old -armored -tech -warrior
+25: Young Woman, female, prone, , +human -child -old -armored -tech -warrior
+26: Boy, male, prone, , +human +child
+27: Girl, female, shock, , +human +child
+29: Rachel, female, bow, , +human +youth
+2A: Katarin, female, sideeye, , +human +youth -armored -warrior
+2B: Impresario, male, anger, noble, +human -child -youth -warrior -armored
+2C: Esper Elder, any, walk, , +demihuman -child -youth
+2D: Yura, any, prone, +demihuman -child
+2E: Sigfried, male, shock, warrior, -creature
+2F: Cid, male, walk, tech, -child -youth -armored -warrior
+30: Maduin, male, prone, , +demihuman -child
+31: Rogue, any, walk, rogue, -child 
+32: Vargas, male, walk, warrior, -child -old -adult -caster
+33: Vomammoth, any, walk, , +creature -mascot
+34: Narshe Guard, any, walk, warrior, -child +clonable -creature -demihuman
+35: Conductor, any, walk, , -creature
+36: Shopkeeper, any, walk, , +human -child
+37: Fairy, any, walk, , -human
+38: Lone Wolf, any, walk, , -human -creature
+39: Dragon, any, walk, , +creature
+3B: Figaro Guard, any, walk, warrior, +human +clonable -child
+3C: Daryl, female, walk, , +human -old -child
+3D: Chupon, any, walk, , +creature
+3E: Cultist, any, walk, , +clonable -child -creature
 
 [Sprites]
 # name: gender, sheet size, filename without suffix, character name (for preventing duplicates), tags
@@ -90,7 +134,7 @@ Meena: female, full, feok-dq-meena, , human caster, -warrior
 Nera: female, full, feok-dq-nera, , human child,
 Asellus: female, full, feok-other-asellus-mystic, , human noble youth,
 White Rose: female, full, feok-other-white-rose, , human youth, -warrior
-Katarina: female, full, feok-rs3-katarina, , human noble rogue,
+Katrina: female, full, feok-rs3-katrina, , human noble rogue,
 Figaro Guard: neutral, full, FigaroGuard, , human warrior clonable,
 Fish: neutral, full, Fish, , creature clonable mascot, +cursed
 Frog: neutral, full, Frog, , demihuman warrior clonable, -caster
@@ -106,7 +150,7 @@ FF6 Girl: female, full, Girl, , human child,
 Goku: male, full, Goku, , human warrior,
 Golbez: neutral, full, Golbez, , human armored warrior caster adult clonable,
 Grandma: female, full, Grandma, , human old noble,
-Holy Dragoon: male, full, Holy Dragoon, , human warrior armored adult,
+Holy Dragoon: male, full, HolyDragoon, , human warrior armored adult,
 Hope: male, full, Hope, , human child,
 Impresario: male, full, Impressario, , human noble old, -rogue
 Interceptor: neutral, full, Interceptor, , creature clonable,
@@ -170,7 +214,7 @@ Rude: male, full, Rude, , human adult clonable,
 Rydia: female, full, Rydia, Rydia, human youth caster noble,
 Rydia (child): female, full, RydiaChild, Rydia, human child, -warrior
 Samus (armored): neutral, full, Samus, Samus, human demihuman armored tech clonable, -caster
-Samus (zero): female, full, SamusZero, Samus, human warrior,
+Samus (zero): female, full, samus-zero, Samus, human warrior,
 Refia (black belt): female, full, scarabenigma-ff-blackbelt-refia, Refia, human noble,
 Refia (monk): female, full, scarabenigma-ff-monk-refia, Refia, human youth,
 Aisha: female, full, scarabenigma-rs-aisha, , human youth, -warrior

@@ -357,16 +357,34 @@ def process_sprite_fixes(data_in):
         #os.path.join("music", s.changeto + "_inst.bin"
         
     return data
+
+def unfuck_portraits(data, f_merchant=False):
+    #clean up the bizarre mess BC leaves in portrait setup
+    o_portptrs = 0x036F00
+
+    loc = o_portptrs
+    pt = (range(0, 0x10) + ([0xE] if f_merchant else [0x10]) + [0x11, 0] +
+            ([0x10] if f_merchant else [1]) + [0x12, 0, 0, 0, 0, 0, 6])
+    porttable = "".join(map(chr, pt))
+    for i in xrange(0,0x1B):
+        porttable = int_insert(porttable, len(porttable), 0x320*pt[i], 2)
+    data = byte_insert(data, loc, porttable, 0x4F)
+    return data
+    
     
 def process_sprite_imports(data_in):
     
     o_charnames = 0x478C0
     o_sprites = 0x150000
     l_fullsprite = 0x16A0
+    o_portraits = 0x2D1D00
+    o_portpals = 0x2D5860
     
     spritecfg = ConfigParser.ConfigParser()
-    allnames = {"female": set(), "neutral": set(), "male": set()}
     spritecfg.read(os.path.join("custom", "SpriteImports.txt"))
+    sizecfg = ConfigParser.ConfigParser()
+    sizecfg.read(os.path.join("tables", "spritesizes.txt"))
+    allnames = {"female": set(), "neutral": set(), "male": set()}
     
     try:
         with open(os.path.join("custom", "FemaleNames.txt"), "r") as nf:
@@ -399,15 +417,41 @@ def process_sprite_imports(data_in):
             self.name, self.gender, self.size, self.file, self.uniqueid, self.tags, self.reqs = name, gender, size, file, uniqueid, tags, reqs
         def __repr__(self):
             return repr(vars(self))
+    
+    class SpriteType:
+        def __init__(self, string):
+            params = string.split()
+            datamap = []
+            self.size = 0
+            for p in params:
+                if '-' in p:
+                    pq = p.split('-')
+                    start = int(pq[0],16) * 0x20
+                    end = (int(pq[1],16)+1) * 0x20
+                else:
+                    start = int(p,16) * 0x20
+                    end = start + 0x20
+                datamap.append((start, end))
+                self.size += (end - start)
+            self.map = datamap
+        def __repr__(self):
+            return "({} bytes: {})".format(self.size, self.map)
+        
+        def build(self, spritesheet):
+            newsheet = ""
+            for m in self.map:
+                newsheet += spritesheet[m[0]:m[1]]
+            return newsheet
+        
     def spoil(txt):
         global spoiler
         if 'Characters' not in spoiler: spoiler['Characters'] = []
         spoiler['Characters'].append(txt)
-    
-    sizedb = {
-        "full": l_fullsprite,
-        "nr": l_fullsprite - 320
-        }
+           
+    #sizedb = {
+    #    "full": l_fullsprite,
+    #    "nr": l_fullsprite - 320
+    #    }
         
     # parse config into actorlist & spritelist
     allactors, allsprites = [], []
@@ -420,7 +464,20 @@ def process_sprite_imports(data_in):
         line = [s.strip() for s in v.split(',')]
         while len(line) < 6: line.append([])
         allsprites.append(Sprite(k, *line))
-        
+    
+    soffsets, sizedb, spritemap = {}, {}, {}
+    for k, v in sizecfg.items("Offsets"):
+        try:
+            soffsets[int(k,16)] = int(v,16)
+        except ValueError:
+            print "WARNING: unparseable sprite offset {}:{}".format(k,v)
+    for k, v in sizecfg.items("SizeTypes"):
+        stype = SpriteType(v)
+        sizedb[k] = stype.size
+        spritemap[k] = stype
+    
+    if 'portraits' in FLAGS: data_in = unfuck_portraits(data_in)
+    
     iterations = 0
     while True:
         uniqueids_used, sprites_used, initials_used = set(), set(), set()
@@ -428,8 +485,8 @@ def process_sprite_imports(data_in):
         spritepos = o_sprites
         retry = False
         spoilertxt = []
-        for a in allactors: #TODO make sure this is ascending by id so that we can keep track of
-            id = int(a.id, 16)   # our position in the spritesheet as we insert
+        for a in allactors: 
+            id = int(a.id, 16) 
             # constraints & purge dupes
             spriteopts = constraint_filter([(s, s.tags, s.reqs) for s in allsprites], 1, (a.tags, a.reqs))
             spriteopts = [s[0] for s in spriteopts if s[0].uniqueid not in uniqueids_used and s[0].name not in sprites_used]
@@ -447,6 +504,7 @@ def process_sprite_imports(data_in):
                 initials_used.add(a.name[0])
             #check filesize (nyi, everything is full size atm)
             thissprite = rng.choice(spriteopts)
+            #print "{}: {} out of {}".format(a.desc, thissprite.name, [s.name for s in spriteopts])
             try:
                 size = sizedb[a.size]
             except ValueError:
@@ -454,7 +512,6 @@ def process_sprite_imports(data_in):
                 retry = False
                 break
             #read image data
-            # (portrait goes here)
             filename = os.path.join("sprites", thissprite.file + ".bin")
             try:
                 with open(filename, "rb") as sf:
@@ -464,14 +521,49 @@ def process_sprite_imports(data_in):
                 print "WARNING: invalid spritesheet {}. Rerolling sprites...".format(filename)
                 retry = True
                 break
+            filename = os.path.join("sprites", thissprite.file + "-P.bin")
+            if 'pixelparty' in FLAGS or 'portraits' not in FLAGS:
+                pdata, ppal = None, None
+            else:
+                try:
+                    with open(filename, "rb") as pf:
+                        pdata = pf.read()
+                    if len(pdata) < 0x320: raise IOError
+                except IOError:
+                    pdata = None
+                if pdata:
+                    filename = os.path.join("sprites", thissprite.file + "-P.pal")
+                    try:
+                        with open(filename, "rb") as pp:
+                            ppal = pp.read()
+                        if len(ppal) < 0x20: raise IOError
+                    except IOError:
+                        ppal = None
+            
+            if a.desc == "Figaro Guard":
+                rdata = spritemap['onlyride'].build(sdata)
+                pdata = spritemap['onlyprone'].build(sdata)
+                data = byte_insert(data, soffsets[0x40], rdata)
+                data = byte_insert(data, soffsets[0x52], pdata)
+                
+            sdata = spritemap[a.size].build(sdata)
+            
             #write
             if id <= 13:
                 romname = a.name.translate(TO_BATTLETEXT)
                 while len(romname) < 6: romname = romname + "\xFF"
                 if len(romname) > 6: romname = romname[:6]
                 data = byte_insert(data, o_charnames + 6*int(a.id, 16), romname, 6)
-            data = byte_insert(data, spritepos, sdata, size)
-            spritepos += size
+            if id <= 17 and pdata and ppal and 'pixelparty' not in FLAGS:
+                loc = o_portraits + id * 0x320
+                data = byte_insert(data, loc, pdata, 0x320)
+                loc = o_portpals + id * 0x20
+                data = byte_insert(data, loc, ppal, 0x20)
+            loc = soffsets[id]
+            data = byte_insert(data, loc, sdata, size)
+            #data = byte_insert(data, spritepos, sdata, size)
+            #spritepos += size
+            sprites_used.add(thissprite.name)
             if hasattr(a, 'name'):
                 spoilertxt.append("{} ({}) -> {} ({})".format(id, a.desc, a.name, thissprite.name))
             else:
@@ -1784,13 +1876,14 @@ def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
             data = byte_insert(data, loc, orig_palettes[p], 32)
         
     # fix BC v64 messing up portrait pointers
-    loc = o_portptrs
-    pt = (range(0, 0x10) + ([0xE] if f_merchant else [0x10]) + [0x11, 0] +
-            ([0x10] if f_merchant else [1]) + [0x12, 0, 0, 0, 0, 0, 6])
-    porttable = "".join(map(chr, pt))
-    for i in xrange(0,0x1B):
-        porttable = int_insert(porttable, len(porttable), 0x320*pt[i], 2)
-    data = byte_insert(data, loc, porttable, 0x4F)
+    data = unfuck_portraits(data, f_merchant)
+    #loc = o_portptrs
+    #pt = (range(0, 0x10) + ([0xE] if f_merchant else [0x10]) + [0x11, 0] +
+    #        ([0x10] if f_merchant else [1]) + [0x12, 0, 0, 0, 0, 0, 6])
+    #porttable = "".join(map(chr, pt))
+    #for i in xrange(0,0x1B):
+    #    porttable = int_insert(porttable, len(porttable), 0x320*pt[i], 2)
+    #data = byte_insert(data, loc, porttable, 0x4F)
     
     assert len(data_in) == len(data)
     return data
@@ -2160,6 +2253,14 @@ def dothething():
     
     if 'ONEWINGEDLEAFER' in modes:
         FLAGS.add("battlebylevel")
+    if 'PIXELPARTY' in modes:
+        FLAGS.add('pixelparty')
+    if 'n' in modes:
+        FLAGS.add('miscfixes')
+    if 'c' in modes:
+        FLAGS.add('spriteimport')
+    if 'x' in modes:
+        FLAGS.add('portraits')
         
     vseed = reseed(vseed)
     if 'm' in modes or 'b' in modes:
