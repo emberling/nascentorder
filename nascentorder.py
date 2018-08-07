@@ -934,6 +934,8 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         vals = [s.strip() for s in ss[1].split(',')]
         songtable[vals[0]] = SongSlot(int(ss[0],16), chance=int(vals[1]))
     
+    tierboss = dict(songconfig.items('TierBoss'))
+    
     # determine which songs change
     used_songs = []
     songs_to_change = []
@@ -1062,6 +1064,92 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
             return False
         return True
         
+    def process_mml(id, mml, name):
+        sfx = ""
+        if id == 0x29:
+            sfx = "sfx_zozo.mmlappend"
+        elif id == 0x4F or id == 0x4c:
+            sfx = "sfx_wor.mmlappend"
+        elif id == 0x20:
+            sfx = "sfx_train.mmlappend"
+            mml = re.sub("\{[^}]*?([0-9]+)[^}]*?\}", "$888\g<1>", mml)
+        if sfx:
+            print "{}, {}, {}".format(id, name, sfx)
+            try:
+                with open(os.path.join('music', sfx), 'r') as f:
+                    mml += f.read()
+            except IOError:
+                print "couldn't open {}".format(sfx)
+                
+        return mml_to_akao(mml, name, True if sfx else False)
+    
+    def process_tierboss(opts):
+        opts = [o.strip() for o in opts.split(',')]
+        attempts = 0
+        fallback = False
+        while True:
+            attempts += 1
+            if attempts >= 1000:
+                print "warning: check your tierboss config in songs.txt"
+                fallback = True
+                attempts = 0
+            retry = False
+            tiernames = rng.sample(opts, 3)
+            tierfiles = []
+            for n in tiernames:
+                try:
+                    with open(os.path.join('music', n + '_dm.mml'), 'r') as f:
+                        tierfiles.append(f.read())
+                except IOError:
+                    print "couldn't open {}".format(n + '_dm.mml')
+                    retry = True
+            if retry: continue
+            
+            mml = re.sub('[~!]', '', tierfiles[0])
+            mml = re.sub('[?_]', '?', mml)
+            mml = re.sub('j([0-9]+),([0-9]+)', 'j\g<1>,555\g<2>', mml)
+            mml = re.sub('([;:\$])([0-9]+)(?![,0-9])', '\g<1>555\g<2>', mml)
+            mml = re.sub('([;:])555444([0-9])', '\g<1>222\g<2>', mml)
+            mml = re.sub('#VARIANT', '#', mml)
+            mml = re.sub('{.*?}', '', mml)
+            mml = re.sub('\$555444([0-9])', '{\g<1>}', mml)
+            tierfiles[0] = mml
+            
+            mml = re.sub('[?!]', '', tierfiles[1])
+            mml = re.sub('[~_]', '?', mml)
+            mml = re.sub('j([0-9]+),([0-9]+)', 'j\g<1>,666\g<2>', mml)
+            mml = re.sub('([;:\$])([0-9]+)(?![,0-9])', '\g<1>666\g<2>', mml)
+            mml = re.sub('([;:])666444([0-9])', '\g<1>333\g<2>', mml)
+            mml = re.sub('\$666444([0-9])', '$222\g<1>', mml)
+            mml = re.sub('#VARIANT', '#', mml)
+            mml = re.sub('{.*?}', '', mml)
+            tierfiles[1] = mml
+            
+            mml = re.sub('[?_]', '', tierfiles[2])
+            mml = re.sub('[~!]', '?', mml)
+            mml = re.sub('j([0-9]+),([0-9]+)', 'j\g<1>,777\g<2>', mml)
+            mml = re.sub('([;:\$])([0-9]+)(?![,0-9])', '\g<1>777\g<2>', mml)
+            mml = re.sub('\$777444([0-9])', '$333\g<1>', mml)
+            mml = re.sub('#VARIANT', '#', mml)
+            mml = re.sub('{.*?}', '', mml)
+            tierfiles[2] = mml
+            
+            mml = "#VARIANT / \n#VARIANT ? ignore \n" + tierfiles[0] + tierfiles[1] + tierfiles[2]
+            
+            #with open('mydebug.mml', 'a+') as f:
+            #    f.seek(0,2)
+            #    f.write(mml)
+                
+            akao = mml_to_akao(mml, str(tiernames), variant='_default_')
+            inst = akao['_default_'][1]
+            akao = akao['_default_'][0]
+            print "debug: len(akao) in tierboss is {:x}".format(len(akao))
+            print tiernames
+            if len(akao) >= 0x1000:
+                continue
+            break
+        return (akao, inst)
+        
     # choose replacement songs
     used_songs_backup = used_songs
     songtable_backup = songtable
@@ -1083,16 +1171,19 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         f_moveinst = False if check_ids_fit() or f_preserve else True
         rng.shuffle(songs_to_change)
         for ident, s in songs_to_change:
-            choices = [c for c in songtable[ident].choices if c not in used_songs]
-            if not choices: choices.append(native_prefix + ident)
-            newsong = rng.choice(choices)
-            if (newsong in used_songs) and (not f_repeat):
-                #print "bounced setting {} as {}".format(newsong, ident)
-                keeptrying = True
-                break
+            if ident in tierboss:
+                songtable[ident].changeto = '!!tierboss'
             else:
-                if not f_repeat: used_songs.append(newsong)
-                songtable[ident].changeto = newsong if f_randomize else native_prefix + ident
+                choices = [c for c in songtable[ident].choices if c not in used_songs]
+                if not choices: choices.append(native_prefix + ident)
+                newsong = rng.choice(choices)
+                if (newsong in used_songs) and (not f_repeat):
+                    #print "bounced setting {} as {}".format(newsong, ident)
+                    keeptrying = True
+                    break
+                else:
+                    if not f_repeat: used_songs.append(newsong)
+                    songtable[ident].changeto = newsong if f_randomize else native_prefix + ident
                 
         if keeptrying:
             dprint("failed music generation during song selection")
@@ -1100,8 +1191,11 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         
         #get data now, so we can keeptrying if there's not enough space
         for ident, s in songtable.items():
+            if s.changeto == '!!tierboss':
+                s.data, s.inst = process_tierboss(tierboss[ident])
+                s.is_pointer = False
             # case: get song from MML
-            if os.path.isfile(os.path.join("music", s.changeto + ".mml")):
+            elif os.path.isfile(os.path.join("music", s.changeto + ".mml")):
                 try:
                     with open(os.path.join("music", s.changeto + ".mml"), 'r') as mmlf:
                         mml = mmlf.read()
@@ -1109,7 +1203,7 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
                     print "couldn't open {}.mml".format(s.changeto)
                     keeptrying = True
                     break
-                akao = mml_to_akao(mml, s.changeto + ".mml")
+                akao = process_mml(s.id, mml, s.changeto + ".mml")
                 s.data = akao['_default_'][0]
                 s.inst = akao['_default_'][1]
                 s.is_pointer = False
