@@ -193,7 +193,6 @@ ff6_kefkastower:kefkastower*2, floatingcont, omen3
 ff6_ruin:       ruin*8, narshe, forest, train, zozo, omen3*8
 
 [TierBoss]
-train: ff6_tier1, ff6_tier2, ff6_tier3, cc_flame, ff3_eureka, ffmq_lava
 dmad123: ff6_tier1, ff6_tier2, ff6_tier3, cc_flame, ff3_eureka, ffmq_lava
 
 [SongSlots]
