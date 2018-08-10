@@ -10,14 +10,15 @@ HIROM = 0xC00000
 defaultmode = 'bmx'
 CONFIG_DEFAULTS = {
         'modes': defaultmode,
+        'free_rom_space': '310000-3FFFFF',
         'skip_hack_detection': 'False',
         'allow_music_repeats': 'False',
         'field_music_chance': '0',
         'preserve_song_data': 'False',
-        'battle_music_lookup': 'battle1, boss1, boss2, battle2, battle3, 3B, battle4, battle5',
-        'battle_music_ids': '24, new, new, new, new',
-        'boss_music_ids': '14, 33',
-        'pause_current_song': 'battle1, battle2, battle3, battle4, battle5',
+        'battle_music_lookup': 'battle1, boss1, boss2, battle2, battle3, 3B, battle4, boss1',
+        'battle_music_ids': '24, new, new, new',
+        'boss_music_ids': 'new, 14, 33',
+        'pause_current_song': 'battle1, battle2, battle3, battle4, boss1',
         'romsize': '300000, 400200',
         'monsters_loc': 'F0000, F2FFF',
         'monsters_size': '20',
@@ -27,8 +28,15 @@ CONFIG_DEFAULTS = {
         'forms_aux_size': '4',
         'songcount': '53C5E',
         'brrpointers': '53C5F, 53D1B',
+        'brrloops': '53D1C, 53D99',
+        'brrpitch': '53D9A, 53E17',
+        'brradsr': '53E18, 53E95',
         'songpointers': '53E96, 53F94',
         'instruments': '53F95, 54A34',
+        'brrpointerpointer': '50222, 50228, 5022E',
+        'brrlooppointer': '5041C',
+        'brrpitchpointer': '5049C',
+        'brradsrpointer': '504DE',
         'songpointerpointer': '50538',
         'instrumentpointer': '501E3',
         'songdata': '85C7A, 9FDFF, 352200',
@@ -56,6 +64,7 @@ FLAGS = set()
 spoiler = {}
 f_tellmewhy = False
 npcdb = {}
+freespace = None
 
 def dprint(msg):
     if DEBUG: print msg
@@ -121,6 +130,12 @@ def printspoiler(f, seed):
         for t in spoiler['Characters']:
             line(t)
     handled.append('Debug')
+    if 'ROM Map' in spoiler:
+        line("ROM MAP")
+        line(separator)
+        for t in spoiler['ROM Map']:
+            line(t)
+    handled.append('ROM Map')
     if DEBUG and 'Debug' in spoiler:
         line()
         line("DEBUG")
@@ -134,6 +149,63 @@ def printspoiler(f, seed):
         for t in spoiler[k]:
             line(t)
 
+#find an empty space in ROM for some data
+def put_somewhere(romdata, newdata, desc, f_silent=False):
+    global freespace, spoiler
+    if freespace is None:
+        init_freespace()
+    success = False
+    for i, (start, end) in enumerate(freespace):
+        room = end-start
+        if room < len(newdata):
+            continue
+        else:
+            romdata = byte_insert(romdata, start, newdata)
+            freespace[i] = (start+len(newdata), end)
+            if 'ROM Map' not in spoiler: spoiler['ROM Map'] = []
+            spoiler['ROM Map'].append("  0x{:x} -- {}".format(start, desc))
+            success= True
+    if not success:
+        if not silent: print "ERROR: not enough free space to insert {}\n\n".format(desc)
+        assert False
+    return (romdata, start, end)
+            
+def init_freespace():
+    global freespace
+    fs = CONFIG.get('General', 'free_rom_space').split()
+    freespace = []
+    while not freespace:
+        for t in fs:
+            if '-' not in t: continue
+            try:
+                start, end = [int(n,16) for n in t.split('-')[0:2]]
+            except ValueError:
+                continue
+            if start >= end: continue
+            freespace.append((start, end))
+        if not freespace:
+            to_default('free_rom_space')
+            continue
+        break
+
+def free_space(start, end):
+    global freespace
+    if freespace is None:
+        init_freespace()
+    freespace.append((start, end))
+    
+    newfs = []
+    for i, (start, end) in enumerate(sorted(freespace)):
+        if newfs:
+            laststart, lastend = newfs[-1][0], newfs[-1][1]
+            if start <= lastend + 1:
+                newfs[-1] = (laststart, end)
+            else:
+                newfs.append((start, end))
+        else:
+            newfs.append((start, end))
+    freespace = newfs
+    
 #expects tag/req pairs encased in longer iterables, for some reason.
 #why? i have no idea, and i wrote this two days ago. *shrug*
 def constraint_filter(choices, choices_idx, given, given_idx=0):
@@ -959,7 +1031,118 @@ def process_char_palettes(data_in, f_cel, f_rave):
     
     return data
         
-def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglist):
+def insert_instruments(data_in):
+    data = data_in
+    print "** Inserting extended instrument samples ..."
+    samplecfg = ConfigParser.ConfigParser()
+    samplecfg.read(os.path.join('tables', 'samples.txt'))
+        
+    #pull out instrument infos
+    sampleptrs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brrpointers').split(',')]
+    if len(sampleptrs) != 2: sampleptrs = to_default('brrpointers')
+    ptrdata = data[sampleptrs[0]:sampleptrs[1]+1]
+    #free_space(sampleptrs[0], sampleptrs[1])
+    
+    looplocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brrloops').split(',')]
+    if len(looplocs) != 2: looplocs = to_default('brrloops')
+    loopdata = data[looplocs[0]:looplocs[1]+1]
+    #free_space(looplocs[0], looplocs[1])
+    
+    pitchlocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brrpitch').split(',')]
+    if len(pitchlocs) != 2: pitchlocs = to_default('brrpitch')
+    pitchdata = data[pitchlocs[0]:pitchlocs[1]+1]
+    #free_space(pitchlocs[0], pitchlocs[1])
+    
+    adsrlocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brradsr').split(',')]
+    if len(adsrlocs) != 2: adsrlocs = to_default('brradsr')
+    adsrdata = data[adsrlocs[0]:adsrlocs[1]+1]
+    #free_space(adsrlocs[0], adsrlocs[1])
+    
+    for id, smp in samplecfg.items('Samples'):
+        id = int(id, 16)
+        print "{}: {}".format(id, smp)
+        
+        inst = [i.strip() for i in smp.split(',')]
+        if len(inst) < 4:
+            print "WARNING: malformed instrument info '{}'".format(smp)
+            continue
+        name, loop, pitch, adsr = inst[0:4]
+        filename = name + '.brr'
+        
+        try:
+            with open(os.path.join('samples', filename), 'rb') as f:
+                sdata = f.read()
+        except IOError:
+            print "WARNING: couldn't load sample file {}".format(filename)
+            continue
+        
+        try:
+            loop = chr(int(loop[0:2], 16)) + chr(int(loop[2:4], 16))
+        except (ValueError, IndexError):
+            print "WARNING: malformed loop info in '{}', using default".format(smp)
+            loop = "\x00\x00"
+        try:
+            pitch = chr(int(pitch[0:2], 16)) + chr(int(pitch[2:4], 16))
+        except (ValueError, IndexError):
+            print "WARNING: malformed pitch info in '{}', using default".format(smp)
+            pitch = "\x00\x00"
+        if adsr:
+            try:
+                attack, decay, sustain, release = [int(p,16) for p in adsr.split()[0:4]]
+                assert attack < 16
+                assert decay < 8
+                assert sustain < 8
+                assert release < 32
+                ad = 1 << 7
+                ad += decay << 4
+                ad += attack
+                sr = sustain << 5
+                sr += release
+                adsr = chr(ad) + chr(sr)
+            except (AssertionError, ValueError, IndexError):
+                print "WARNING: malformed ADSR info in '{}', disabling envelope".format(smp)
+                adsr = "\x00\x00"
+        else:
+            adsr = "\x00\x00"
+            
+        data, s, e = put_somewhere(data, sdata, "(sample) [{:02x}] {}".format(id, name))
+        ptrdata = int_insert(ptrdata, (id-1)*3, s + HIROM, 3)
+        loopdata = byte_insert(loopdata, (id-1)*2, loop, 2)
+        pitchdata = byte_insert(pitchdata, (id-1)*2, pitch, 2)
+        adsrdata = byte_insert(adsrdata, (id-1)*2, adsr, 2)
+        
+    #data, s, e = put_somewhere(data, ptrdata, "POINTERS TO INSTRUMENT BRR DATA")
+    #CONFIG.set('MusicPtr', 'brrpointers', "{:x}, {:x}".format(s, e))
+    #locs = [int(st.strip(),16) for st in CONFIG.get('MusicPtr', 'brrpointerpointer').split(',')]
+    #print locs
+    #for i, l in enumerate(locs):
+    #    print "{:x} -> ".format(s+i+HIROM, l)
+    #    data = int_insert(data, l, s + i + HIROM, 3)
+    data = byte_insert(data, sampleptrs[0], ptrdata)
+    CONFIG.set('MusicPtr', 'brrpointers', "{:x}, {:x}".format(sampleptrs[0], sampleptrs[0]+len(data)))
+    print "foo"
+    data, s, e = put_somewhere(data, loopdata, "INSTRUMENT LOOP DATA")
+    CONFIG.set('MusicPtr', 'brrloops', "{:x}, {:x}".format(s, e))
+    loc = int(CONFIG.get('MusicPtr', 'brrlooppointer'),16)
+    data = int_insert(data, loc, s + HIROM, 3)
+    
+    data, s, e = put_somewhere(data, pitchdata, "INSTRUMENT PITCH DATA")
+    CONFIG.set('MusicPtr', 'brrpitch', "{:x}, {:x}".format(s, e))
+    loc = int(CONFIG.get('MusicPtr', 'brrpitchpointer'),16)
+    data = int_insert(data, loc, s + HIROM, 3)
+    
+    data, s, e = put_somewhere(data, adsrdata, "INSTRUMENT ADSR DATA")
+    CONFIG.set('MusicPtr', 'brradsr', "{:x}, {:x}".format(s, e))
+    loc = int(CONFIG.get('MusicPtr', 'brradsrpointer'),16)
+    data = int_insert(data, loc, s + HIROM, 3)
+    
+    return data
+                
+
+def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsonglist):
+    global freespace
+    data = data_in
+    freespacebackup = freespace
     print "** Processing random music ..." if f_randomize else "** Processing custom music ..."
     f_repeat = CONFIG.getboolean('Music', 'allow_music_repeats')
     f_preserve = CONFIG.getboolean('Music', 'preserve_song_data')
@@ -1252,6 +1435,8 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
     while keeptrying and attempts <= 1000:
         attempts += 1
         keeptrying = False
+        data = data_in
+        freespace = freespacebackup
         used_songs = copy(used_songs_backup)
         songtable = copy(songtable_backup)
         songs_to_change = copy(songs_to_change_backup)
@@ -1398,6 +1583,8 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
                     i += 1
                 if streak >= 64: freelocs.append((i-streak, i))
             songdatalocs = freelocs
+        else:
+            free_space(songdatalocs[0][0], songdatalocs[0][1])
         if f_moveinst:
             instsize = (len(songtable)+1) * 0x20
             for i, l in enumerate(songdatalocs):
@@ -1410,30 +1597,43 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         space = [e - b for b, e in songdatalocs]
         songdata = [""] * len(space)
         songinst = data[isetlocs[0]:isetlocs[1]+1]    
+        if f_moveinst: free_space(isetlocs[0], isetlocs[1])
         #dprint("    free space for music: {}".format(space))
         for ident, s in songtable.items():
             #dprint("attempting to insert {} in slot {} ({})".format(s.changeto, s.id, ident))
-            for i, l in enumerate(songdatalocs):
-                if not s.is_pointer:
-                    if space[i] >= len(s.data):
-                        insertloc = l[0] + len(songdata[i])
-                        songdata[i] += s.data
-                        space[i] -= len(s.data)
-                        songinst = byte_insert(songinst, s.id * isetsize, s.inst, isetsize)
-                        songptrdata = int_insert(songptrdata, s.id * 3, insertloc + HIROM, 3)
-                        songlocations[s.id] = insertloc
-                        break
-                else:
-                    songptrdata = int_insert(songptrdata, s.id * 3, s.data, 3)
-                    songlocations[s.id] = s.data - HIROM
-                    break
+#            for i, l in enumerate(songdatalocs):
+#                if not s.is_pointer:
+#                    if space[i] >= len(s.data):
+#                        insertloc = l[0] + len(songdata[i])
+#                        songdata[i] += s.data
+#                        space[i] -= len(s.data)
+#                        songinst = byte_insert(songinst, s.id * isetsize, s.inst, isetsize)
+#                        songptrdata = int_insert(songptrdata, s.id * 3, insertloc + HIROM, 3)
+#                        songlocations[s.id] = insertloc
+#                        break
+#                    else:
+#                        songptrdata = int_insert(songptrdata, s.id * 3, s.data, 3)
+#                        songlocations[s.id] = s.data - HIROM
+#                        break
+            if not s.is_pointer:
+                try:
+                    data, start, end = put_somewhere(data, s.data, "  (song) [{:02x}] {}".format(s.id, s.changeto), True)
+                except AssertionError:
+                    data = data_in
+                    continue
+                songinst = byte_insert(songinst, s.id * isetsize, s.inst, isetsize)
+                songptrdata = int_insert(songptrdata, s.id * 3, start + HIROM, 3)
+                songlocations[s.id] = start
+            else:
+                songptrdata = int_insert(songptrdata, s.id * 3, s.data, 3)
+                songlocations[s.id] = s.data - HIROM
                     
     if attempts >= 1000:
         print "failed to produce valid music set"
         print "    try increasing available space or adjusting song insert list"
         print "    to use less space"
         print
-        return data
+        return data_in
     
     # build battle music related tables
     if f_battleprog:
@@ -1463,13 +1663,15 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         
         
     # write to rom
-    if f_moveinst:
+    #if f_moveinst:
         #songptrptr = int(CONFIG.get('MusicPtr', 'songpointerpointer'), 16)
         #don't need to move song pointers because we are assuming it can just
         #extend into the instrument space we are now freeing. may need to
         #add contingency for if they are already separate later.
-        instlocptr = int(CONFIG.get('MusicPtr', 'instrumentpointer'), 16)
-        data = int_insert(data, instlocptr, new_instloc[0] + HIROM, 3)
+        
+        #instlocptr = int(CONFIG.get('MusicPtr', 'instrumentpointer'), 16)
+        #data = int_insert(data, instlocptr, new_instloc[0] + HIROM, 3)
+        
         
     if f_battleprog:
         data = byte_insert(data, pausetableloc, pausetable, 5)
@@ -1478,11 +1680,14 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
     if not f_moveinst: songptrdata = songptrdata[:songptraddrs[1] + 1]
     data = byte_insert(data, songptraddrs[0], songptrdata)
     if f_moveinst:
-        data = byte_insert(data, new_instloc[0], songinst, end=new_instloc[1])
+        #data = byte_insert(data, new_instloc[0], songinst, end=new_instloc[1])
+        data, s, e = put_somewhere(data, songinst, "INSTRUMENT TABLES FOR SONGS")
+        instlocptr = int(CONFIG.get('MusicPtr', 'instrumentpointer'), 16)
+        data = int_insert(data, instlocptr, s + HIROM, 3)
     else:
         data = byte_insert(data, isetlocs[0], songinst, end=isetlocs[1])
-    for i, l in enumerate(songdatalocs):
-        data = byte_insert(data, l[0], songdata[i], end=l[1])
+    #for i, l in enumerate(songdatalocs):
+    #    data = byte_insert(data, l[0], songdata[i], end=l[1])
     
     # make spoiler
     changed_songs = {}
@@ -2197,6 +2402,7 @@ def dothething():
     print "  b - create battle music progression"
     print "  c - randomize character names, sprites, and portraits (portraits NYI)"
     # g - script edits reflecting characters' randomized identities
+    print "  i - add extended instruments"
     print "  n - convert oldcharname to class, and other tiny misc NaO flavored fixes"
     print "  m - music randomizer"
     print "  p - redo character palettes"
@@ -2261,6 +2467,9 @@ def dothething():
         FLAGS.add('spriteimport')
     if 'x' in modes:
         FLAGS.add('portraits')
+        
+    if 'i' in modes:
+        data = insert_instruments(data)
         
     vseed = reseed(vseed)
     if 'm' in modes or 'b' in modes:
