@@ -14,7 +14,7 @@ MEDIA INCLUDED:
 Song conversions:
     emberling -- cc_dragonia
                  ct_theme
-                 ff5_ahead
+                 ff5_theme
                  ffmq_battle1, ffmq_boss, ffmq_forest, ffmq_fossil, ffmq_lava,
                  ffmq_light, ffmq_rock, ffmq_roll, ffmq_tower, ffmq_victory
                  ds4_lyll
@@ -32,10 +32,10 @@ Song conversions:
                  evo_boss
                  ff1_battle, ff1_dungeon
                  ff3_darkworld, ff3_eureka
-                 ff4_airship, ff4_babil, ff4_golbez, ff4_longway,
-                 ff4_overworld, ff4_prologue, ff4_redwings, ff4_restless,
-                 ff4_somewhere, ff4_sorrow, ff4_town, ff4_troia,
-                 ff4_underworld, ff4_zeromus, ff4_zot
+                 ff4_airship, ff4_babil, ff4_giant, ff4_giant_remix,
+                 ff4_golbez, ff4_longway, ff4_overworld, ff4_prologue,
+                 ff4_redwings, ff4_restless, ff4_somewhere, ff4_sorrow,
+                 ff4_town, ff4_troia, ff4_underworld, ff4_zeromus, ff4_zot
                  ff5_exdeath, ff5_world2
                  ff6_town2
                  ff7_5years, ff7_costa, ff7_temple, ff7_tifa
@@ -62,6 +62,7 @@ Song conversions:
                ff8_heresy
                ff9_messenger
                ffx_ambition
+Samples provided by madsiur and tsushiy
 Sprites:
     Palettes and other adjustments for randomization - CtrlxZ, emberling
     Original sprites: Madsiur, Gi Nattak, Ameratsu, Arodrick, Astaroth,

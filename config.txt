@@ -2,15 +2,14 @@
 # uncomment it, unless it's already been uncommented!
 
 [General]
-# set default modes
-;modes: m ALTSONGLISTMUSICCHAOSTESTFILE ; for testing single music files
-modes: bnmpx
+;free_rom_space: 310000-3FFFFF
 
 # by default, NaO will attempt to detect some known romhacks and adjust
 # pointers accordingly. Set this to prevent this behavior if you are getting
 # false positives.
 ;skip_hack_detection: True
 
+# 
 [Music]
 # self explanatory, uncomment to activate
 ;allow_music_repeats: True
@@ -29,17 +28,17 @@ field_music_chance: 0
 # battle formations to set music. by default is as unintrusive as possible
 # table is eight entries long unless you've hacked it otherwise somehow.
 # use either song id or "battle" or "boss" followed by a number
-;battle_music_lookup: battle1, boss1, boss2, battle2, battle3, 3B, battle4, battle5
+;battle_music_lookup: battle1, boss2, boss3, battle2, battle3, 3B, battle4, boss1
 
 # song ids to use for battle music progression mode (new to add a song id)
 # every battle/boss used in battle_music_lookup must be represented here
-;battle_music_ids: 24, new, new, new, new
-;boss_music_ids: 14, 33
+;battle_music_ids: 24, new, new, new
+;boss_music_ids: new, 14, 33
 
 # in battle music progression mode, determines which songs pause field
 # song and resume it after battle. without specialized hacks, only
 # five of these are available
-;pause_current_song: battle1, battle2, battle3, battle4, battle5
+;pause_current_song: battle1, battle2, battle3, battle4, boss1
 
 ### Variables below this line mostly allow you to adjust pointers, for if you
 ### are using an already hacked FF6 ROM and this data has been moved from where
@@ -77,11 +76,32 @@ field_music_chance: 0
 # start and end location for BRR pointers
 ;brrpointers: 53C5F, 53D1B
 
+# start and end location for instrument loop info
+;brrloops: 53D1C, 53D99
+
+# start and end location for instrument pitch info
+;brrpitch: 53D9A, 53E17
+
+# start and end location for instrument ADSR info
+;brradsr: 53E18, 53E95
+
 # start and end location for song pointers
 ;songpointers: 53E96, 53F94
 
 # start and end location for instrument sets
 ;instruments: 53F95, 54A34
+
+# pointers to instrument BRR pointers (3x)
+;brrpointerpointer: 50222, 50228, 5022E
+
+# pointer to instrument loop data
+;brrlooppointer: 5041C
+
+# pointer to instrument pitch data
+;brrpitchpointer: 5049C
+
+# pointer to instrument ADSR data
+;brradsrpointer: 504DE
 
 # pointer to song pointer location
 ;songpointerpointer: 50538
@@ -93,7 +113,7 @@ field_music_chance: 0
 # include any number of start/end pairs. if an odd number of entries are made
 # then anything from the last entry to the end of 32Mbit ROM is fair game!
 # (if you want to mess with stuff over 32Mbit, include both start and end)
-;songdata: 85C7A, 9FDFF, 352200
+songdata: 85C7A, 9FDFF
 
 # songs that pause the current song
 ;pausesongs: 506F9, 506FD
