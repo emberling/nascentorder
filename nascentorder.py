@@ -1343,11 +1343,14 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
         sfx = ""
         if id == 0x29:
             sfx = "sfx_zozo.mmlappend"
-        elif id == 0x4F or id == 0x4c:
+        elif id == 0x4F:
             sfx = "sfx_wor.mmlappend"
         elif id == 0x20:
             sfx = "sfx_train.mmlappend"
             mml = re.sub("\{[^}]*?([0-9]+)[^}]*?\}", "$888\g<1>", mml)
+            for i in xrange(1,9):
+                if "$888{}".format(i) not in mml:
+                    mml = mml + "\n$888{} r;".format(i)
         if sfx:
             print "{}, {}, {}".format(id, name, sfx)
             try:

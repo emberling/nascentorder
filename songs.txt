@@ -43,7 +43,7 @@ ff4_underworld: balance, cyan, forest, town_ruin
 ff4_zeromus:    I95, G90, metamorphosis, floatingcont, fanatics, kefkastower, atma
 ff4_zot:        troops, metamorphosis, catastrophe, floatingcont, fanatics
 ff4_whale:      chocobo, savethem, grandfinale, fanfare, blackjack, falcon, floatingcont
-ff5_ahead:      locke, setzer, savethem, blackjack, falcon, fanfare, prelude
+ff5_theme:      locke, setzer, savethem, blackjack, falcon, fanfare, prelude
 ff5_bridge:     I95, G40, savethem, metamorphosis, grandfinale, gogo, floatingcont, kefkastower, atma
 ff5_exdeath:    I55, G75, metamorphosis, catastrophe, boss, kefka
 ff5_world2:     prelude, awakening, balance, daryl, celes, narshe, forest, espers, serpent, ruin, omen3
@@ -76,8 +76,8 @@ ffmq_gale:      I25, G90, locke, savethem, grandfinale, mountain, returners, uma
 ffmq_lava:      I65, G70, boss, magitek, floatingcont
 ffmq_light:     prelude, awakening, relm, town
 ffmq_rock:      I20, G05, setzer, chocobo, johnny, zozo, prelude*4, battle
-ffmq_roll:      locke, setzer, chocobo, johnny, grandfinale, gogo, moogles
 ffmq_tower:     I55, G70, cyan, savethem, troops, umaro, floatingcont, kefkastower, catastrophe, omen3
+ffmq_tristam:   locke, setzer, chocobo, johnny, grandfinale, gogo, moogles
 ffmq_victory:   fanfare
 iog_boss:       I90, G55, metamorphosis, grandfinale, unforgiven*2
 lu1_boss:       I65, G50, savethem, metamorphosis, catastrophe, magitek, floatingcont, kefkastower, boss
