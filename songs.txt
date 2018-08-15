@@ -19,7 +19,7 @@ ct_theme:       I75, G70, prelude, locke, setzer, savethem, grandfinale, falcon
 ds4_lyll:       I30, G40, prelude, cyan, locke, setzer, chocobo, savethem, grandfinale, mountain, serpent, unforgiven, floatingcont, falcon
 evo_boss:       I85, G40, boss, atma
 ff1_battle:     I15, G00, grandfinale, unforgiven
-ff1_dungeon:    I60, G35, metamorphosis, grandfinale, unforgiven*2, kefkastower
+ff1_dungeon:    I60, G30, metamorphosis, grandfinale, unforgiven*2, kefkastower
 ff3_darkworld:  locke, setzer, chocobo, veldt, mountain, fanatics
 ff3_eureka:     prelude, balance, shadow, cyan, setzer, espers, mountain, serpent, floatingcont, falcon, fanatics, kefkastower
 ff4_airship:    locke, setzer, chocobo, grandfinale, fanfare, blackjack, falcon
@@ -165,7 +165,7 @@ ff6_martiallaw: martiallaw*2, shadow, celes, narshe, zozo, town_ruin, omen3
 ff6_metamorphosis: metamorphosis*2, grandfinale, unforgiven, floatingcont, kefkastower
 ff6_train_ext:  train*3, narshe, shadow, zozo, town_ruin, ruin, omen3
 ff6_espers:     espers*2, shadow, strago, celes, forest, train, serpent, town_ruin, ruin, omen3
-ff6_grandfinale: I80, G50, grandfinale*4, setzer, chocobo, johnny, gogo, umaro, spinachrag, falcon
+ff6_grandfinale: I80, G30, grandfinale*4, setzer, chocobo, johnny, gogo, umaro, spinachrag, falcon
 ff6_mountain:   mountain, locke, veldt, troops, serpent, zozo, gogo, returners, umaro
 ff6_battle:     I30, G15, battle
 ff6_fanfareslow: fanfare

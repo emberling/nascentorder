@@ -567,7 +567,6 @@ def process_sprite_imports(data_in):
                 a.gender = rng.choice(["female"]*9 + ["male"]*9 + ["neutral"]*2)
             spriteopts = [s for s in spriteopts if s.gender == a.gender or (s.gender == "neutral" and rng.choice([True, False]))]
             if id <= 13:
-                print a.gender
                 nameopts = [n for n in allnames[a.gender].union(allnames["neutral"]) if n[0] not in initials_used]
                 if not nameopts:
                     retry = True
@@ -602,9 +601,16 @@ def process_sprite_imports(data_in):
                         pdata = pf.read()
                     if len(pdata) < 0x320: raise IOError
                 except IOError:
-                    pdata = None
+                    try:
+                        filename = os.path.join("sprites", thissprite.uniqueid + "-P.bin")
+                        with open(filename, "rb") as pf:
+                            pdata = pf.read()
+                        if len(pdata) < 0x320: raise IOError
+                    except IOError:
+                        pdata = None
                 if pdata:
-                    filename = os.path.join("sprites", thissprite.file + "-P.pal")
+                    #filename = os.path.join("sprites", thissprite.file + "-P.pal")
+                    filename = filename[:-3] + "pal"
                     try:
                         with open(filename, "rb") as pp:
                             ppal = pp.read()
@@ -1266,6 +1272,14 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
         battleids = [s.strip() for s in CONFIG.get('Music', 'battle_music_ids').split(',')]
         bossids = [s.strip() for s in CONFIG.get('Music', 'boss_music_ids').split(',')]
         newidx = 0
+        old_method = False if "battlebylevel" not in FLAGS else True
+        if not old_method:
+            if len(battleids) != 4 or len(bossids) != 3:
+                print "WARNING: Improper song ID configuration for default method (by area)"
+                print "     Falling back to old method (by level)"
+                old_method = True
+                FLAGS.append("battlebylevel")
+                
         for i, id in enumerate(battleids):
             if str(id).lower() == "new":
                 songtable['NaObattle' + str(newidx)] = SongSlot(nextsongid, chance=100)
@@ -1286,38 +1300,91 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
         
         # what this is trying to do is:
         # we judge songs by pure INTENSITY or by combined INTENSITY and GRANDEUR
-        # new method: all songs separated by pure intensity into battle and boss
+        # old method: all songs separated by pure intensity into battle and boss
         # within these categories they are set in combined rating order
+        # new method: uses subsets of the I/G grid as pools for songs.
+        # 1. event-battle (boss0) is chosen from I>33, G<33
+        # 2. boss2 is chosen from I>min(boss0,60), G>66
+        # 3. boss1 is chosen from I>boss0, boss0<G<boss2
+        # 4. battle0 and battle1 chosen from I<boss0, G<max(50,boss1), sorted by G
+        # 5. battle2 and battle3 chosen from I<boss2, G>battle1
+        def intensity_subset(imin=0, gmin=0, imax=99, gmax=99):
+            print {k: v for k, v in intensitytable.items() if v[0] >= imin and v[0] <= imax and v[1] >= gmin and v[1] <= gmax and k not in used_songs}
+            return {k: v for k, v in intensitytable.items() if v[0] >= imin and v[0] <= imax and v[1] >= gmin and v[1] <= gmax and k not in used_songs}
+            
         battlecount = len(battleids) + len(bossids)
         while len(intensitytable) < battlecount:
             dprint("WARNING: not enough battle songs marked, adding random song to pool")
             newsong = rng.choice([k[0] for k in songconfig.items('Imports') if k not in intensitytable])
             intensitytable[newsong] = (rng.randint(0,9), rng.randint(0,9))
-        retry = True
-        while retry:
-            retry = False
-            battlechoices = rng.sample([(k, sum(intensitytable[k]), intensitytable[k][0]) for k in intensitytable.keys()], battlecount)
-            for c in battlechoices:
-                if battlechoices[0] in used_songs: retry = True
-        battlechoices.sort(key=operator.itemgetter(1))
-        battleprog = [None]*len(battleids)
-        bossprog = [None]*len(bossids)
-        #battleprog[0] = battlechoices.pop(0)
-        #bossprog[0] = battlechoices.pop(-1)
-        bosschoices = []
-        battlechoices.sort(key=operator.itemgetter(2))
-        for i in xrange(0, len(bossids)):
-            bosschoices.append(battlechoices.pop(-1))
-        bosschoices.sort(key=operator.itemgetter(1))
-        while None in bossprog:
-            bossprog[bossprog.index(None)] = bosschoices.pop(-1)
-        bossprog.reverse()
-        battlechoices.sort(key=operator.itemgetter(1))
-        while None in battleprog:
-            battleprog[battleprog.index(None)] = battlechoices.pop(0)
-        battleprog = [b[0] for b in battleprog]
-        bossprog = [b[0] for b in bossprog]
-        
+
+        if old_method:
+            retry = True
+            while retry:
+                retry = False
+                battlechoices = rng.sample([(k, sum(intensitytable[k]), intensitytable[k][0]) for k in intensitytable.keys()], battlecount)
+                for c in battlechoices:
+                    if battlechoices[0] in used_songs: retry = True
+            battlechoices.sort(key=operator.itemgetter(1))
+            battleprog = [None]*len(battleids)
+            bossprog = [None]*len(bossids)
+            #battleprog[0] = battlechoices.pop(0)
+            #bossprog[0] = battlechoices.pop(-1)
+            bosschoices = []
+            battlechoices.sort(key=operator.itemgetter(2))
+            for i in xrange(0, len(bossids)):
+                bosschoices.append(battlechoices.pop(-1))
+            bosschoices.sort(key=operator.itemgetter(1))
+            while None in bossprog:
+                bossprog[bossprog.index(None)] = bosschoices.pop(-1)
+            bossprog.reverse()
+            battlechoices.sort(key=operator.itemgetter(1))
+            while None in battleprog:
+                battleprog[battleprog.index(None)] = battlechoices.pop(0)
+            battleprog = [b[0] for b in battleprog]
+            bossprog = [b[0] for b in bossprog]
+        else:
+            tries=0
+            while True:
+                try:
+                    event, (ei, eg) = rng.choice(intensity_subset(imin=33, gmax=33).items())
+                    bt = min(ei,60) 
+                    print "bt {}".format(bt)
+                    super, (si, sg) = rng.choice(intensity_subset(imin=bt, gmin=66).items())
+                    boss, (bi, bg) = rng.choice(intensity_subset(imin=bt, gmin=eg, gmax=sg).items())
+                    wt = max(bg, 50)
+                    balance = rng.sample(intensity_subset(imax=bt, gmax=wt).items(), 2)
+                    if balance[0][1][0] + balance[0][1][1] > balance[1][1][0] + balance[1][1][1]:
+                        boutside, (boi, bog) = balance[1]
+                        binside, (bii, big) = balance[0]
+                    else:
+                        boutside, (boi, bog) = balance[0]
+                        binside, (bii, big) = balance[1]
+                    ruin = rng.sample(intensity_subset(imax=min(bi, si), gmin=max(bog,big)).items(), 2)
+                    if ruin[0][1][0] + ruin[0][1][1] > ruin[1][1][0] + ruin[1][1][1]:
+                        routside, (roi, rog) = ruin[1]
+                        rinside, (rii, rig) = ruin[0]
+                    else:
+                        routside, (roi, rog) = ruin[0]
+                        rinside, (rii, rig) = ruin[1]
+                    battleprog = [boutside, binside, routside, rinside]
+                    bossprog = [event, boss, super]
+                    if len(set(battleprog) | set(bossprog)) < 7:
+                        tries += 1
+                        continue
+                except IndexError as e:
+                    print "DEBUG: new battle prog mode failed {}rd attempt: {}".format(tries, e)
+                    raw_input("press enter to continue>")
+                    if tries >= 500:
+                        FLAGS.append("battlebylevel")
+                        print "WARNING: couldn't find valid configuration of battle songs by area."
+                        print "     Falling back to old method (by level)."
+                        return process_battleprog()
+                    else:
+                        tries += 1
+                        continue
+                break
+                    
         fightids = [(id, False) for id in battleids] + [(id, True) for id in bossids]
         for id, is_boss in fightids:
             for ident, s in songtable.items():
@@ -2042,31 +2109,31 @@ def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
             thisport = data[loc:loc+0x320]
             
             thishash = hashlib.md5(thisport).hexdigest()
-            print "got portrait {} -- md5 {}".format(pid, thishash)
+            #print "got portrait {} -- md5 {}".format(pid, thishash)
             if thishash in porthashes:
                 spritehashes = porthashtbl[porthashes.index(thishash)][1:]
-                print "hash match (known ph). {} sprite hashes identified: {}".format(len(spritehashes), spritehashes)
+                #print "hash match (known ph). {} sprite hashes identified: {}".format(len(spritehashes), spritehashes)
                 sloc = o_spritesheet + (min(sid,16) * o_spritesizea) + (max(0,sid-16) * o_spritesizeb)
                 thissprite = data[sloc:sloc+o_spritesizeb]
                 shash = hashlib.md5(thissprite).hexdigest()
-                print "got sprite {} -- len {} md5 {}".format(sid, len(thissprite), shash)
+                #print "got sprite {} -- len {} md5 {}".format(sid, len(thissprite), shash)
                 if shash not in spritehashes:
-                    print "sprite not approved for placeholder. setting to change"
+                    #print "sprite not approved for placeholder. setting to change"
                     changemap[pp] = True
                 else:
                     thisidx = spritehashes.index(shash)
                     if shash in spriterecord:
                         if spriterecord[shash][1] <= thisidx:
-                            print "{} found in record, supersedes idx{}".format(spriterecord[shash][1],thisidx)
+                            #print "{} found in record, supersedes idx{}".format(spriterecord[shash][1],thisidx)
                             changemap[pp] = True
                         else:
                             changemap[spriterecord[shash][0]] = False
                             spriterecord[shash] = (pid, thisidx)
-                            print "recorded {} for {}".format(spriterecord[shash], shash)
+                            #print "recorded {} for {}".format(spriterecord[shash], shash)
             elif thisport in orig_portraits:
-                print "this duplicates pid {}, setting to change".format(orig_portraits.index(thisport))
+                #print "this duplicates pid {}, setting to change".format(orig_portraits.index(thisport))
                 changemap[pp] = True
-                print changemap
+                #print changemap
             orig_portraits.append(thisport)
             
             loc = o_portpals + pid * 32

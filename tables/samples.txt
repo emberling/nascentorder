@@ -1,7 +1,8 @@
 [Samples]
 # id: filename, loop point, pitch multiplier data, attack decay sustain release
 40: ts40_horn,      1107, 5200, F 7 7  0
-41: s20a_guitar,    CE07, D560, F 7 7 10
+#41: s20a_guitar,    CE07, D560, F 7 7 10
+41: fm23_halo,      7704, FFF0, F 7 7  0
 42: ts42_celesta,   4605, E100, F 7 7  C
 43: ts43_synstr,    C804, 1E00, F 7 7  0
 44: s201_synplk,    4206, FC60, F 7 7  F
@@ -67,7 +68,8 @@
 80: ts80_fbass,     4605, FF00, F 7 7  0
 81: s32a_msnare,    CA08, 0000, F 7 7  0
 82: s329_brass,     1B09, D280, F 7 7  A
-83: s32f_pluck,     610E, FC65, F 7 7  C
+#83: s32f_pluck,     610E, FC65, F 7 7  C
+83: sm32_future,    7704, FFE1, F 7 7  0
 84: ts84_snare,     0000, 0000, F 7 7  0
 85: ts85_percslap,  0000, 0000, F 7 7  0
 86: ts86_xylophone, 8F07, 19B0, F 7 7 18
