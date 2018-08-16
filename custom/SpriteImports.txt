@@ -236,7 +236,7 @@ Opera Celes: female, full, OperaCeles, Celes, human noble,
 Cid Orlandu: male, full, Orlandu, , human old,
 Cecil (paladin): male, full, PCecil, , human warrior noble adult,
 Peach: female, full, Peach, , human noble youth, -warrior
-Penelo: female, full, Penelo, human youth,
+Penelo: female, full, Penelo, , human youth,
 Pig: neutral, full, Pig, , creature clonable mascot,
 Potato: neutral, full, Potato, , , +cursed
 Dr. Mog: neutral, full, ProfMog, , creature clonable mascot,
