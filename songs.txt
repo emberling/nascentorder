@@ -17,6 +17,7 @@ cc_miguel:      prelude, awakening, gau, rachel, gestahl, train, grandfinale, ru
 ct_boss2:       I90, G60, savethem, metamorphosis, grandfinale, catastrophe
 ct_theme:       I75, G70, prelude, locke, setzer, savethem, grandfinale, falcon
 ds4_lyll:       I30, G40, prelude, cyan, locke, setzer, chocobo, savethem, grandfinale, mountain, serpent, unforgiven, floatingcont, falcon
+eo3_waves:      I70, G99, chocobo, grandfinale, atma, magitek, floatingcont, falcon, kefkastower
 evo_boss:       I85, G40, boss, atma
 ff1_battle:     I15, G00, grandfinale, unforgiven
 ff1_dungeon:    I60, G30, metamorphosis, grandfinale, unforgiven*2, kefkastower
