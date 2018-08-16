@@ -7,7 +7,7 @@ from string import maketrans
 from mml2mfvi import mml_to_akao
 
 HIROM = 0xC00000
-defaultmode = 'bmx'
+defaultmode = 'bcinmpx'
 CONFIG_DEFAULTS = {
         'modes': defaultmode,
         'free_rom_space': '310000-3FFFFF',
@@ -530,7 +530,6 @@ def process_sprite_imports(data_in):
     for k, v in spritecfg.items("Characters"):
         line = [s.strip() for s in v.split(',')]
         while len(line) < 5: line.append([])
-        print line
         allactors.append(Actor(k, *line))
     for k, v in spritecfg.items("Sprites"):
         line = [s.strip() for s in v.split(',')]
@@ -548,7 +547,7 @@ def process_sprite_imports(data_in):
         sizedb[k] = stype.size
         spritemap[k] = stype
     
-    if 'portraits' in FLAGS: data_in = unfuck_portraits(data_in)
+    data_in = unfuck_portraits(data_in)
     
     iterations = 0
     while True:
@@ -593,7 +592,7 @@ def process_sprite_imports(data_in):
                 retry = True
                 break
             filename = os.path.join("sprites", thissprite.file + "-P.bin")
-            if 'pixelparty' in FLAGS or 'portraits' not in FLAGS:
+            if 'pixelparty' in FLAGS:
                 pdata, ppal = None, None
             else:
                 try:
@@ -617,6 +616,19 @@ def process_sprite_imports(data_in):
                         if len(ppal) < 0x20: raise IOError
                     except IOError:
                         ppal = None
+            if pdata is None and 'portraits' not in FLAGS: #alternate fallback mode
+                try:
+                    filename = os.path.join("sprites", "fixes", "fallback-portrait.bin")
+                    with open(filename, "rb") as pf:
+                        pdata = pf.read()
+                    if len(pdata) < 0x320: raise IOError
+                    filename = filename[:-3] + "pal"
+                    with open(filename, "rb") as pp:
+                        ppal = pp.read()
+                    if len(ppal) < 0x20: raise IOError
+                except IOError:
+                    pdata = "\x00"*320
+                
             
             if a.desc == "Figaro Guard":
                 rdata = spritemap['onlyride'].build(sdata)
@@ -1066,7 +1078,6 @@ def insert_instruments(data_in):
     
     for id, smp in samplecfg.items('Samples'):
         id = int(id, 16)
-        print "{}: {}".format(id, smp)
         
         inst = [i.strip() for i in smp.split(',')]
         if len(inst) < 4:
@@ -1126,7 +1137,7 @@ def insert_instruments(data_in):
     #    data = int_insert(data, l, s + i + HIROM, 3)
     data = byte_insert(data, sampleptrs[0], ptrdata)
     CONFIG.set('MusicPtr', 'brrpointers', "{:x}, {:x}".format(sampleptrs[0], sampleptrs[0]+len(data)))
-    print "foo"
+
     data, s, e = put_somewhere(data, loopdata, "INSTRUMENT LOOP DATA")
     CONFIG.set('MusicPtr', 'brrloops', "{:x}, {:x}".format(s, e))
     loc = int(CONFIG.get('MusicPtr', 'brrlooppointer'),16)
@@ -1309,7 +1320,6 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
         # 4. battle0 and battle1 chosen from I<boss0, G<max(50,boss1), sorted by G
         # 5. battle2 and battle3 chosen from I<boss2, G>battle1
         def intensity_subset(imin=0, gmin=0, imax=99, gmax=99):
-            print {k: v for k, v in intensitytable.items() if v[0] >= imin and v[0] <= imax and v[1] >= gmin and v[1] <= gmax and k not in used_songs}
             return {k: v for k, v in intensitytable.items() if v[0] >= imin and v[0] <= imax and v[1] >= gmin and v[1] <= gmax and k not in used_songs}
             
         battlecount = len(battleids) + len(bossids)
@@ -1349,7 +1359,7 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                 try:
                     event, (ei, eg) = rng.choice(intensity_subset(imin=33, gmax=33).items())
                     bt = min(ei,60) 
-                    print "bt {}".format(bt)
+
                     super, (si, sg) = rng.choice(intensity_subset(imin=bt, gmin=66).items())
                     boss, (bi, bg) = rng.choice(intensity_subset(imin=bt, gmin=eg, gmax=sg).items())
                     wt = max(bg, 50)
@@ -1419,7 +1429,6 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                 if "$888{}".format(i) not in mml:
                     mml = mml + "\n$888{} r;".format(i)
         if sfx:
-            print "{}, {}, {}".format(id, name, sfx)
             try:
                 with open(os.path.join('music', sfx), 'r') as f:
                     mml += f.read()
@@ -1488,8 +1497,6 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
             akao = mml_to_akao(mml, str(tiernames), variant='_default_')
             inst = akao['_default_'][1]
             akao = akao['_default_'][0]
-            print "debug: len(akao) in tierboss is {:x}".format(len(akao))
-            print tiernames
             if len(akao) >= 0x1000:
                 continue
             break
@@ -2470,7 +2477,7 @@ def dothething():
     print
     print "Options: (lowercase)"
     print "  b - create battle music progression"
-    print "  c - randomize character names, sprites, and portraits (portraits NYI)"
+    print "  c - randomize character names, sprites, and portraits"
     # g - script edits reflecting characters' randomized identities
     print "  i - add extended instruments"
     print "  n - convert oldcharname to class, and other tiny misc NaO flavored fixes"
