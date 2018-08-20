@@ -565,12 +565,18 @@ def process_sprite_imports(data_in):
             if a.gender not in ["female", "male", "neutral"]:
                 a.gender = rng.choice(["female"]*9 + ["male"]*9 + ["neutral"]*2)
             spriteopts = [s for s in spriteopts if s.gender == a.gender or (s.gender == "neutral" and rng.choice([True, False]))]
+            if not spriteopts:
+                retry = True
+                break
             if id <= 13:
-                nameopts = [n for n in allnames[a.gender].union(allnames["neutral"]) if n[0] not in initials_used]
+                nameopts = set([n for n in allnames[a.gender] if n[0] not in initials_used])
+                for n in allnames["neutral"]:
+                    if n[0] not in initials_used and rng.choice([True, False]):
+                        nameopts.add(n)
                 if not nameopts:
                     retry = True
                     break
-                a.name = rng.choice(nameopts)
+                a.name = rng.choice(list(nameopts))
                 initials_used.add(a.name[0])
             #check filesize (nyi, everything is full size atm)
             thissprite = rng.choice(spriteopts)
@@ -654,6 +660,8 @@ def process_sprite_imports(data_in):
             #data = byte_insert(data, spritepos, sdata, size)
             #spritepos += size
             sprites_used.add(thissprite.name)
+            if thissprite.uniqueid:
+                uniqueids_used.add(thissprite.uniqueid)
             if hasattr(a, 'name'):
                 spoilertxt.append("{} ({}) -> {} ({})".format(id, a.desc, a.name, thissprite.name))
             else:
@@ -1565,6 +1573,9 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                     if 'nopatch' in akao:
                         s.inst = akao['nopatch'][1]
                         s.data = akao['nopatch'][0]
+                    elif 'nat' in akao:
+                        s.inst = akao['nat'][1]
+                        s.data = akao['nat'][0]
                     else:
                         print "WARNING: instrument out of range in {}".format(s.changeto + ".mml")
                         
