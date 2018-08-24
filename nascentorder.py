@@ -123,18 +123,21 @@ def printspoiler(f, seed):
         line(separator)
         for t in spoiler['Music']:
             line(t)
+        line('\n')
     handled.append('Characters')
     if 'Characters' in spoiler:
         line("CHARACTERS")
         line(separator)
         for t in spoiler['Characters']:
             line(t)
+        line('\n')
     handled.append('Debug')
     if 'ROM Map' in spoiler:
         line("ROM MAP")
         line(separator)
         for t in spoiler['ROM Map']:
             line(t)
+        line('\n')
     handled.append('ROM Map')
     if DEBUG and 'Debug' in spoiler:
         line()
@@ -142,12 +145,14 @@ def printspoiler(f, seed):
         line(separator)
         for t in spoiler['Debug']:
             line(t)
+        line('\n')
     for k in [sk for sk in spoiler if sk not in handled]:
         line()
         line(k)
         line(separator)
         for t in spoiler[k]:
             line(t)
+        line('\n')
 
 #find an empty space in ROM for some data
 def put_somewhere(romdata, newdata, desc, f_silent=False):
@@ -165,6 +170,7 @@ def put_somewhere(romdata, newdata, desc, f_silent=False):
             if 'ROM Map' not in spoiler: spoiler['ROM Map'] = []
             spoiler['ROM Map'].append("  0x{:x} -- {}".format(start, desc))
             success= True
+            break
     if not success:
         if not silent: print "ERROR: not enough free space to insert {}\n\n".format(desc)
         assert False

@@ -10,10 +10,13 @@
 # Boss 1 cares more about Intensity, Battle 3-4 care more about Grandeur
 [Imports]
 #custom songs
+bof2_battle:    I75, E05, unforgiven, grandfinale, battle
 cc_arni:        gau, relm, town, prelude
 cc_dragonia:    omen3, train, espers, zozo, magitek, fanatics, kefkastower
 cc_flame:       I75, G95, kefka, metamorphosis, grandfinale, catastrophe, floatingcont, fanatics, kefkastower
 cc_miguel:      prelude, awakening, gau, rachel, gestahl, train, grandfinale, ruin, fanatics, omen3
+ct_battle:      I35, G05, battle, boss
+ct_battle2:     I10, G20, battle, grandfinale
 ct_boss2:       I90, G60, savethem, metamorphosis, grandfinale, catastrophe
 ct_theme:       I75, G70, prelude, locke, setzer, savethem, grandfinale, falcon
 ds4_lyll:       I30, G40, prelude, cyan, locke, setzer, chocobo, savethem, grandfinale, mountain, serpent, unforgiven, floatingcont, falcon
@@ -44,12 +47,14 @@ ff4_underworld: balance, cyan, forest, town_ruin
 ff4_zeromus:    I95, G90, metamorphosis, floatingcont, fanatics, kefkastower, atma
 ff4_zot:        troops, metamorphosis, catastrophe, floatingcont, fanatics
 ff4_whale:      chocobo, savethem, grandfinale, fanfare, blackjack, falcon, floatingcont
-ff5_theme:      locke, setzer, savethem, blackjack, falcon, fanfare, prelude
+ff5_battle:     I10, G10, battle
 ff5_bridge:     I95, G40, savethem, metamorphosis, grandfinale, gogo, floatingcont, kefkastower, atma
+ff5_theme:      locke, setzer, savethem, blackjack, falcon, fanfare, prelude
 ff5_exdeath:    I55, G75, metamorphosis, catastrophe, boss, kefka
 ff5_world2:     prelude, awakening, balance, daryl, celes, narshe, forest, espers, serpent, ruin, omen3
 ff6_town2:      relm, martiallaw, town, moogles, spinachrag
 ff7_5years:     shadow, narshe, forest, gestahl*2, town_ruin, ruin*2, omen3
+ff7_battle:     I35, G30, battle, grandfinale
 ff7_costa:      prelude, gau, setzer, veldt, martiallaw, zozo, spinachrag
 ff7_hurry2:     I70, G10, savethem, grandfinale, gogo, umaro, unforgiven, metamorphosis, floatingcont, battle
 ff7_judgment:   I00, G99, troops, mountain, gogo, umaro, catastrophe, floatingcont, fanatics, kefkastower, omen3
@@ -130,15 +135,16 @@ sdnt_boss:      I70, G45, magitek, floatingcont, kefkastower
 sdnt_courage:   I65, G90, savethem*2, locke, setzer, grandfinale, metamorphosis, floatingcont, kefkastower, boss, atma
 sdnt_fate:      rachel, daryl, celes, town_ruin, omen3
 sdnt_field:     I50, G85, balance, figaro, setzer, grandfinale, mountain, returners, fanfare, blackjack, falcon*2, battle, boss
-sdnt_risingsun: prelude, awakening, relm, celes, forest, town, omen3
+sdnt_risingsun: prelude, awakening, relm, celes, town, omen3
 top_world3:     I50, G70, setzer, chocobo, johnny, floatingcont, falcon, magitek
+xg_boss:        I75, G50, boss, atma, savethem, grandfinale, kefkastower
 xg_chuchu:      prelude, gau, relm, grandfinale, what, gogo, moogles, spinachrag
 xg_mermaid:     shadow, coin, rachel, daryl, celes, forest, espers, town_ruin, ruin, omen3
 zaol_overworld: prelude, figaro, locke, setzer, troops, grandfinale, returners
 zoot_storms:    prelude, gau, relm, zozo, gogo, umaro, spinachrag
 
 #native songs
-ff6_prelude:    prelude, espers, balance, omen3
+ff6_prelude:    prelude, balance, omen3
 ff6_awakening:  awakening*2, celes, gau
 ff6_balance:    balance*2, returners
 ff6_shadow:     shadow, narshe, martiallaw, zozo, omen3
@@ -172,7 +178,7 @@ ff6_battle:     I30, G15, battle
 ff6_fanfareslow: fanfare
 ff6_serpent:    serpent, espers
 ff6_zozo:       zozo*3, shadow, setzer, veldt, martiallaw, train, gogo, spinachrag, magitek, omen3
-ff6_town:       town, awakening, balance, gau, relm
+ff6_town:       town, balance, gau, relm
 ff6_what:       what*3, gau, relm, veldt, grandfinale, gogo, umaro, owzer, spinachrag
 ff6_gogo:       gogo, gau, setzer, johnny, kefka, grandfinale, zozo, what, umaro, moogles, owzer, spinachrag
 ff6_returners:  returners, figaro, cyan, troops, martiallaw, grandfinale, umaro, owzer, spinachrag
