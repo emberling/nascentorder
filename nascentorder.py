@@ -439,6 +439,7 @@ def process_sprite_fixes(data_in):
 def unfuck_portraits(data, f_merchant=False):
     #clean up the bizarre mess BC leaves in portrait setup
     o_portptrs = 0x036F00
+    o_portraits = 0x2D1D00
 
     loc = o_portptrs
     pt = (range(0, 0x10) + ([0xE] if f_merchant else [0x10]) + [0x11, 0] +
@@ -447,6 +448,7 @@ def unfuck_portraits(data, f_merchant=False):
     for i in xrange(0,0x1B):
         porttable = int_insert(porttable, len(porttable), 0x320*pt[i], 2)
     data = byte_insert(data, loc, porttable, 0x4F)
+    
     return data
     
     
@@ -595,6 +597,7 @@ def process_sprite_imports(data_in):
                 break
             #read image data
             filename = os.path.join("sprites", thissprite.file + ".bin")
+            print "read sprite {}".format(filename)
             try:
                 with open(filename, "rb") as sf:
                     sdata = sf.read()
@@ -604,20 +607,23 @@ def process_sprite_imports(data_in):
                 retry = True
                 break
             filename = os.path.join("sprites", thissprite.file + "-P.bin")
-            if 'pixelparty' in FLAGS:
+            if 'pixelparty' in FLAGS or (id >= 18 and id != 20):
                 pdata, ppal = None, None
             else:
                 try:
+                    print "trying portrait file {}".format(filename)
                     with open(filename, "rb") as pf:
                         pdata = pf.read()
                     if len(pdata) < 0x320: raise IOError
                 except IOError:
                     try:
                         filename = os.path.join("sprites", thissprite.uniqueid + "-P.bin")
+                        print "trying portrait file {}".format(filename)
                         with open(filename, "rb") as pf:
                             pdata = pf.read()
                         if len(pdata) < 0x320: raise IOError
                     except IOError:
+                        print "no portrait file found"
                         pdata = None
                 if pdata:
                     #filename = os.path.join("sprites", thissprite.file + "-P.pal")
@@ -628,7 +634,7 @@ def process_sprite_imports(data_in):
                         if len(ppal) < 0x20: raise IOError
                     except IOError:
                         ppal = None
-            if pdata is None and 'portraits' not in FLAGS: #alternate fallback mode
+            if pdata is None: #alternate fallback mode
                 try:
                     filename = os.path.join("sprites", "fixes", "fallback-portrait.bin")
                     with open(filename, "rb") as pf:
@@ -639,7 +645,7 @@ def process_sprite_imports(data_in):
                         ppal = pp.read()
                     if len(ppal) < 0x20: raise IOError
                 except IOError:
-                    pdata = "\x00"*320
+                    pdata = "\x00"*0x320
                 
             
             if a.desc == "Figaro Guard":
@@ -656,10 +662,11 @@ def process_sprite_imports(data_in):
                 while len(romname) < 6: romname = romname + "\xFF"
                 if len(romname) > 6: romname = romname[:6]
                 data = byte_insert(data, o_charnames + 6*int(a.id, 16), romname, 6)
-            if id <= 17 and pdata and ppal and 'pixelparty' not in FLAGS:
-                loc = o_portraits + id * 0x320
+            pid = 18 if id == 20 else id
+            if pid <= 18 and pdata and ppal and 'pixelparty' not in FLAGS:
+                loc = o_portraits + pid * 0x320
                 data = byte_insert(data, loc, pdata, 0x320)
-                loc = o_portpals + id * 0x20
+                loc = o_portpals + pid * 0x20
                 data = byte_insert(data, loc, ppal, 0x20)
             loc = soffsets[id]
             data = byte_insert(data, loc, sdata, size)
