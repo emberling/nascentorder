@@ -15,7 +15,7 @@
 ;allow_music_repeats: True
 
 # how often battles will continue playing field music
-field_music_chance: 0
+;field_music_chance: 0
 
 # by default, the existing song data will be wiped and replaced,
 # preserving only songs that are still used, and repacking them throughout
@@ -110,10 +110,7 @@ field_music_chance: 0
 ;instrumentpointer: 501E3
 
 # start and end location for song storage
-# include any number of start/end pairs. if an odd number of entries are made
-# then anything from the last entry to the end of 32Mbit ROM is fair game!
-# (if you want to mess with stuff over 32Mbit, include both start and end)
-songdata: 85C7A, 9FDFF
+;songdata: 85C7A, 9FDFF
 
 # songs that pause the current song
 ;pausesongs: 506F9, 506FD

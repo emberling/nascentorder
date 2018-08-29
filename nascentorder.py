@@ -1,4 +1,4 @@
-VERSION = "DEV 0.2.0"
+VERSION = "WIP 0.2.0"
 DEBUG = True
 import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib, re, csv
 from copy import copy
@@ -23,7 +23,8 @@ CONFIG_DEFAULTS = {
         'monsters_loc': 'F0000, F2FFF',
         'monsters_size': '20',
         'forms_loc': 'F6200, F83FF',
-        'forms_size': '15',
+        'forms_size': 'F',
+        'forms_count': '240',
         'forms_aux': 'F5900, F61FF',
         'forms_aux_size': '4',
         'songcount': '53C5E',
@@ -39,7 +40,7 @@ CONFIG_DEFAULTS = {
         'brradsrpointer': '504DE',
         'songpointerpointer': '50538',
         'instrumentpointer': '501E3',
-        'songdata': '85C7A, 9FDFF, 352200',
+        'songdata': '85C7A, 9FDFF',
         'pausesongs': '506F9, 506FD',
         'battlesongs': '2BF3B, 2BF42',
         'spritesheet': '150000',
@@ -208,6 +209,33 @@ def free_space(start, end):
                 newfs[-1] = (laststart, end)
             else:
                 newfs.append((start, end))
+        else:
+            newfs.append((start, end))
+    freespace = newfs
+
+def claim_space(startc, endc):
+    global freespace
+    if freespace is None: return
+    if startc > endc: return
+    newfs = []
+    for i, (start, end) in enumerate(sorted(freespace)):
+        if startc <= start and endc >= end:
+            pass
+        elif startc <= start and endc >= start:
+            newstart = endc+1
+            if newstart < end:
+                newfs.append((newstart, end))
+        elif startc <= end and endc >= end:
+            newend = startc-1
+            if newend > start:
+                newfs.append((start, newend))
+        elif startc >= start and endc <= end:
+            newend = startc-1
+            newstart = endc+1
+            if newend > start:
+                newfs.append((start, newend))
+            if newstart > end:
+                newfs.append((newstart, end))
         else:
             newfs.append((start, end))
     freespace = newfs
@@ -597,7 +625,6 @@ def process_sprite_imports(data_in):
                 break
             #read image data
             filename = os.path.join("sprites", thissprite.file + ".bin")
-            print "read sprite {}".format(filename)
             try:
                 with open(filename, "rb") as sf:
                     sdata = sf.read()
@@ -611,19 +638,16 @@ def process_sprite_imports(data_in):
                 pdata, ppal = None, None
             else:
                 try:
-                    print "trying portrait file {}".format(filename)
                     with open(filename, "rb") as pf:
                         pdata = pf.read()
                     if len(pdata) < 0x320: raise IOError
                 except IOError:
                     try:
                         filename = os.path.join("sprites", thissprite.uniqueid + "-P.bin")
-                        print "trying portrait file {}".format(filename)
                         with open(filename, "rb") as pf:
                             pdata = pf.read()
                         if len(pdata) < 0x320: raise IOError
                     except IOError:
-                        print "no portrait file found"
                         pdata = None
                 if pdata:
                     #filename = os.path.join("sprites", thissprite.file + "-P.pal")
@@ -1329,6 +1353,7 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                 newidx += 1
             else:
                 bossids[i] = int(id, 16)
+        claim_space(songptraddrs[0], songptraddrs[0] + 3*len(songtable))
         
         # what this is trying to do is:
         # we judge songs by pure INTENSITY or by combined INTENSITY and GRANDEUR
@@ -1456,7 +1481,7 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
             except IOError:
                 print "couldn't open {}".format(sfx)
                 
-        return mml_to_akao(mml, name, True if sfx else False)
+        return mml_to_akao(mml, name, True if (sfx and id != 0x29) else False)
     
     def process_tierboss(opts):
         opts = [o.strip() for o in opts.split(',')]
@@ -1699,6 +1724,7 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
         songdata = [""] * len(space)
         songinst = data[isetlocs[0]:isetlocs[1]+1]    
         if f_moveinst: free_space(isetlocs[0], isetlocs[1])
+        claim_space(songptraddrs[0], songptraddrs[0] + 3*(len(songtable)+1))
         #dprint("    free space for music: {}".format(space))
         for ident, s in songtable.items():
             #dprint("attempting to insert {} in slot {} ({})".format(s.changeto, s.id, ident))
@@ -1840,7 +1866,8 @@ def process_formation_music(data, f_shufflefield):
         monsterlevels.append(ord(data[levelloc]))
         
     # build table of average levels within formations
-    formcount = (formlocs[1] + 1 - formlocs[0]) / formsize
+    #formcount = (formlocs[1] + 1 - formlocs[0]) / formsize
+    formcount = int(CONFIG.get('EnemyPtr', 'forms_count'), 16)
     formlevels = []
     forms = [] #debug
     for i in xrange(0, formcount):
@@ -1959,6 +1986,14 @@ def process_formation_music(data, f_shufflefield):
         keepfield = byte >> 7
         song = (byte >> 3) & 0b111
         maxlevel = max(formlevels)
+        if i in [512,513,514]:
+            byte |= 0b10000000
+            fanbyte = ord(auxdata[loc-2])
+            fanbyte |= 0b10
+            auxdata = byte_insert(auxdata, loc-2, chr(fanbyte))
+            formsongs.append("x")
+            auxdata = byte_insert(auxdata, loc, chr(byte))
+            continue
         if song == 1 and not keepfield:
             if rng.randint(0, 20 + maxlevel) < (20 + formlevels[i]):
                 song = 2
@@ -1980,11 +2015,11 @@ def process_formation_music(data, f_shufflefield):
             if f_shufflefield:
                 fieldchance = int(CONFIG.get('Music', 'field_music_chance').strip())
                 if fieldchance > 100 or fieldchance < 0: fieldchance = to_default('field_music_chance')
-                if rng.randint(1,100) > fieldchance:
+                if  rng.randint(1,100) > fieldchance:
                     byte &= 0b01111111
                     fanfare = True
                 else:
-                    byte |= 1 << 7
+                    byte |= (1 << 7)
                     fanfare = False
                 fanbyte = ord(auxdata[loc-2])
                 if fanfare:
@@ -2131,7 +2166,6 @@ def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
     else:
         changemap = [False] * 19
         for p in xrange(0,21):
-            print "P {}".format(p)
             if p in [18, 19]: continue
             pp = 18 if p == 20 else p
             pid = ord(data[o_portptrs + p])

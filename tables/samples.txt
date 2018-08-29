@@ -1,7 +1,6 @@
 [Samples]
 # id: filename, loop point, pitch multiplier data, attack decay sustain release
 40: ts40_horn,      1107, 5200, F 7 7  0
-#41: s20a_guitar,    CE07, D560, F 7 7 10
 41: fm23_halo,      7704, FFF0, F 7 7  0
 42: ts42_celesta,   4605, E100, F 7 7  C
 43: ts43_synstr,    C804, 1E00, F 7 7  0
@@ -45,30 +44,29 @@
 69: ts69_rkorgan,   3609, FC7F, F 7 7  0
 6A: tr0a_brass,     800D, D38A, F 0 6  0 
 6B: ts6b_bass,      4A04, FCA0, F 7 7  C
-6C: tr17_dguitar,   7B0C, D5C0, F 3 3  0 
+6C: tr17_dguitar,   7B0C, D7C0, F 3 3  0 
 6D: ts6d_cymbal,    FA05, 0000, F 7 7 10
-6E: tr18_eguitar,   0D08, DFFA, F 3 3  0
-6F: tr19_eguitar,   1E06, D38A, F 3 3  0
-70: tr3a_synbass,   E30D, DFFA, F 7 7  0
+6E: tr18_eguitar,   0D08, E05A, F 3 3  0
+6F: tr19_eguitar,   1E06, D28A, F 3 3  0
+70: tr3a_synbass,   E30D, E05A, F 7 7  0
 71: ts71_esnare,    9411, C000, F 7 7  0
-72: tr20_fhorn,     1F08, DFFA, F 3 2  0 
-73: tr21_ehorn,     721E, DFFA, F 0 2  0
-74: tr0f_clarinet,  EB02, DFFA, F 1 5  0
+72: tr20_fhorn,     1F08, E05A, F 3 2  0 
+73: tr21_ehorn,     721E, E05A, F 0 2  0
+74: tr0f_clarinet,  EB02, E05A, F 1 5  0
 75: f508_timpani,   9411, FB00, F 7 7  0
 76: ts76_bells,     F504, FE48, F 7 7 10
 77: tr29_orchhit,   E30D, D5C0, E 0 0  0
-78: tr0c_bassoon,   EA09, D38A, F 7 7  0
+78: tr0c_bassoon,   EA09, D25A, F 7 7  0
 79: ts79_piano,     C108, E000, C 6 7  E
 7A: ts7a_horn,      330C, FE00, F 7 7  0
 7B: ct1c_bpiano,    D413, BB74, F 7 7  E
-7C: tr27_synth,     5304, DF48, F 7 7  0
+7C: tr27_synth,     5304, DEC8, F 7 7  0
 7D: s319_overdrive, 9114, 0226, E 7 7  9
 7E: ts7e_snare,     0000, 0000, F 7 7  0
 7F: ts7f_trumpet,   8C01, E300, F 7 7  0
 80: ts80_fbass,     4605, FF00, F 7 7  0
 81: s32a_msnare,    CA08, 0000, F 7 7  0
 82: s329_brass,     1B09, D280, F 7 7  A
-#83: s32f_pluck,     610E, FC65, F 7 7  C
 83: sm32_future,    7704, FFE1, F 7 7  0
 84: ts84_snare,     0000, 0000, F 7 7  0
 85: ts85_percslap,  0000, 0000, F 7 7  0

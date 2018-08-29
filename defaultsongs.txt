@@ -89,3 +89,6 @@
 52: dmad4,      0
 53: ending1,    0  
 54: ending2,    0
+
+[TierBoss]
+dmad123: ff6_tier1, ff6_tier2, ff6_tier3

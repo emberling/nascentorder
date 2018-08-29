@@ -23,12 +23,12 @@
 
 #def global= t185 %v48 %x240 %b00,70
 
-#def string= |0 p20 ~o5~/o5/ 'vstr'
-#def fl= |3 p50 o5 'vfl'
-#def pet= |1 p80 ~o6~/o6/ 'vpet'
-#def horn= |4 p35 ~o5~/o5/ 'vhorn'
-#def bone= ~|2~/|1/ p90 ~o6~/o5/ 'vbone'
-#def bass= |5 p64 o5 v64 %a14
+#def string= |0 p20 ~o5~/o5/ 'vstr' %e0
+#def fl= |3 p50 o5 'vfl' %e1
+#def pet= |1 p80 ~o6~/o6/ 'vpet' %e1
+#def horn= |4 p35 ~o5~/o5/ 'vhorn' %e1
+#def bone= ~|2~/|1/ p90 ~o6~/o5/ 'vbone' %e1
+#def bass= |5 p64 o5 v64 %a14 %e0
 #def vstr= v80
 #def vfl= v48
 #def vpet= v64
@@ -46,22 +46,22 @@
 #def srise= v32v192,96
 #def sroll= v96v96,32[12"\s"]v96,96[12"\s"]
 
-#drum "a"=3f  |7v127
-#drum "b"=3a- |7v127
-#drum "c"=3b- |7v127
-#drum "d"=4c  |7v127
-#drum "e"=4d- |7v127
-#drum "f"=4e- |7v127
-#drum "g"=4f  |7v127
-#drum "p"=~5c |Bv32~ /5b |Bv32 %s24/
-#drum "q"=5e  |Bv52
-#drum "r"=~5b~/5g/  |8v32
-#drum "s"=~5b~/5g/  |8v96
-#drum "t"=~5b~/4b/  ~|9~/|7/v80
-#drum "u"=~5f~/4g/  ~|9~/|7/v80
-#drum "v"=~5c~/4e/  ~|9~/|7/v80
-#drum "y"=5g  |Cv127 %r18
-#drum "z"=5a  |Cv127
+#drum "a"=3f  |7v127 %e0
+#drum "b"=3a- |7v127 %e0
+#drum "c"=3b- |7v127 %e0
+#drum "d"=4c  |7v127 %e0
+#drum "e"=4d- |7v127 %e0
+#drum "f"=4e- |7v127 %e0
+#drum "g"=4f  |7v127 %e0
+#drum "p"=~5c |Bv32~ /5b |Bv32 %s24/ %e0
+#drum "q"=5e  |Bv52 %e0
+#drum "r"=~5b~/5g/  |8v32 %e0
+#drum "s"=~5b~/5g/  |8v96 %e0
+#drum "t"=~5b~/4b/  ~|9~/|7/v80 %e0
+#drum "u"=~5f~/4g/  ~|9~/|7/v80 %e0
+#drum "v"=~5c~/4e/  ~|9~/|7/v80 %e0
+#drum "y"=5g  |Cv127 %r18 %e0
+#drum "z"=5a  |Cv127 %e0
 
 ##### ST1 #####
 {1}
@@ -313,7 +313,7 @@ $
 'pet''h' l8
 [v64 r1r v168,127[7a-]]v64 r1r v168,127[7b-]
 [p64 "!oz1" 'pet''h' v64 r v168,127[7a-]]
- p64 "!oz1" 'pet''h' v64 r v168,127[7b-]
+ p64 "!!!oz1" 'pet''h' v64 r v168,127[7b-]
 ;
 
 ##### TIMP #####
@@ -372,7 +372,7 @@ $
 ##41
 l8
 [p64 "!oz1" 'pet''h' v64 r v168,127[7f]]
- p64 "!oz1" 'pet''h' v64 r v168,127[7g]
+ p64 "!!!oz1" 'pet''h' v64 r v168,127[7g]
 ["!!!osrrsrrsr rsrrsrsr"]
  "srrsrrsr rsrr" v96,127 l16 [8"\s"] l8
  "sqqsqqsq" 'srise' "\sspssssq"

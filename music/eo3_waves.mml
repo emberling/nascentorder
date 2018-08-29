@@ -20,7 +20,7 @@
 #WAVE 0x2B  ~0x68~ /0x11/ Hi-Hat
 #WAVE 0x2C  ~0x6D~ /0x12/ Cymbal
 
-#def global= t188 %v48 %x232 %b00,70
+#def global= t188 %v36 %x232 %b00,70
 
 #def organ= |1 p48 ~v32 o6 %a6~ /v40 o6 %a6/
 #def organ2= |1 p48 ~v56 o6 %s20~ /v40 o6/
@@ -48,7 +48,7 @@
 #def hv=v96
 
 ##### ORGAN #####
-{1} 'global' 'organ' l8
+{1} 'global' %e1 'organ' l8
 p0,60,127
 [4f>a<dg>a<da>a< de>a<df>a<d>a< $99]
 $[2
@@ -80,7 +80,7 @@ $19
 'organ2';18
 
 ##### LEAD #####
-{2} l16
+{2} l16 %e1
 'celesta_solo'
 d1^2 ^4. o5p80 a<cd1^1 ^1 ^2.^8<fd c>a16^8^2.v192,0^1v
 $[2
@@ -114,7 +114,7 @@ m
 ;28
 
 ##### ATMOSPHERE MID #####
-{3} l1
+{3} l1 %e1
 'deepness2' p112
 d^^^ >b-^^^
 $[2
@@ -152,7 +152,7 @@ v p112 'pad2' L1 >
 ;38
 
 ##### ATMOSPHERE LOW #####
-{7} l1
+{7} l1 %e1
 'deepness' p16 
 d^^^ >b-^^^
 $[2
@@ -190,7 +190,7 @@ $49
 ;48
 
 ##### ATMOSPHERE HIGH #####
-{6} l8
+{6} l8 %e1
 'atmosynth'
 p0,83,104
 [4 [5dfe]d ] 
@@ -225,7 +225,7 @@ $59
 
 ##### BASS #####
 {5} l16
-'bass'
+'bass' %e1
 d8r8drd8.rdrd8.r drd8.rdrd8r8drcr d8r8drd8.rdrd8.r drd8.rdrd8r8drcr>
 b-8r8b-rb-8.rb-rb-8.r b-rb-8.rb-rb-8r8b-rar b-8r8b-rb-8.rb-rb-8.r b-rb-8.rb-rb-8r8b-rb-r
 $[2

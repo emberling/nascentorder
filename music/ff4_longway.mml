@@ -7,6 +7,7 @@
 #WAVE 0x20 -- 0x07
 #WAVE 0x21 -- 0x0D
 
+#SFXV ` *
 
 {1}
 l16t75%v32%x192%b0,70%e1%k1 $1 v48p62@32o4r1  ^1  ^1  ^1  
@@ -18,7 +19,7 @@ g4a8b8f+2  g4b8<d8f+4^8d8  e2^4f+ed8  e1
 ;1
 
 l16
-{2}
+*{2}*`{8}`
 l16%e1%k1 $2 v80p62@33o5e4e4drd4d8  e4e4f+rf+4f+8  
 e4e4drd4d8  e4e4f+rf+4f+8  e4e4drd4d8  e4e4f+rf+4f+8  
 e4e4drd4d8  e4e4f+rf+4f+8  e4e4drd4d8  e4e4f+rf+4f+8  
@@ -28,7 +29,7 @@ e4e4drd4d8  e4e4f+rf+4f+8
 ;2
 
 l16
-{3}
+*{3}*`{2}`
 l16%e1%k1 $3 v80p62@33o5>e1  
 e1  e1  e1  e1  
 e1  e1  e1  e1  
@@ -38,7 +39,7 @@ e1  e1  e1
 ;3
 
 l16
-{4}
+*{4}*`{5}`
 l16%e1%k1 $4 v80p62@33o5o3e1  
 e1  e1  e1  e1  
 e1  e1  e1  e1  
@@ -48,7 +49,7 @@ e1  e1  e1
 ;4
 
 l16
-{5}
+*{5}*`{7}`
 l16%e1%k1 $5 v80p62@33o5>b4b4ara4b8  
 b4b4<c+rc+4c+8  >b4b4ara4b8  b4b4<c+rc+4c+8  >b4b4ara4b8  
 b4b4<c+rc+4c+8  >b4b4ara4b8  b4b4<c+rc+4c+8  >b4b4ara4b8  
