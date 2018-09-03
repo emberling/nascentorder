@@ -15,7 +15,7 @@ CONFIG_DEFAULTS = {
         'allow_music_repeats': 'False',
         'field_music_chance': '0',
         'preserve_song_data': 'False',
-        'battle_music_lookup': 'battle1, boss1, boss2, battle2, battle3, 3B, battle4, boss1',
+        'battle_music_lookup': 'battle1, boss2, boss3, battle2, battle3, 3B, battle4, boss1',
         'battle_music_ids': '24, new, new, new',
         'boss_music_ids': 'new, 14, 33',
         'pause_current_song': 'battle1, battle2, battle3, battle4, boss1',
@@ -2012,7 +2012,7 @@ def process_formation_music(data, f_shufflefield):
                 else:
                     song = 0
             byte = (byte & 0b11000111) | (song << 3)
-            if f_shufflefield:
+            if f_shufflefield and (f_bylevel or song != 7):
                 fieldchance = int(CONFIG.get('Music', 'field_music_chance').strip())
                 if fieldchance > 100 or fieldchance < 0: fieldchance = to_default('field_music_chance')
                 if  rng.randint(1,100) > fieldchance:

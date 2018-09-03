@@ -24,13 +24,14 @@ def int_insert(data, position, newdata, length, reversed=True):
     return byte_insert(data, position, "".join(l), length)
 
 def warn(fileid, cmd, msg):
+    global mml_log
     m = "{}: WARNING: in {:<10}: {}".format(fileid, cmd, msg)
     print m
-    if mml_log: mml_log += m + '\n'
+    if __name__ == "__main__": mml_log += m + '\n'
 
 def mlog(msg):
     global mml_log
-    if mml_log: mml_log += msg + '\n'
+    if __name__ == "__main__": mml_log += msg + '\n'
     
 class Drum:
     def __init__(self, st):
@@ -524,7 +525,8 @@ def clean_end():
     quit()
     
 if __name__ == "__main__":
-    
+    mml_log = "\n"
+
     print "mfvitools MML to AKAO SNESv4 converter"
     print
     

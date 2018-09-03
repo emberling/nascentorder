@@ -16,6 +16,7 @@ cc_dragonia:    omen3, train, espers, zozo, magitek, fanatics, kefkastower
 cc_home:        prelude, balance, gau, relm, veldt
 cc_flame:       I75, G95, kefka, metamorphosis, grandfinale, catastrophe, floatingcont, fanatics, kefkastower
 cc_miguel:      prelude, awakening, gau, rachel, gestahl, train, grandfinale, ruin, fanatics, omen3
+crys_fields:    strago, locke, setzer, veldt, grandfinale, gogo, moogles
 ct_battle:      I35, G05, battle, boss
 ct_battle2:     I10, G20, battle, grandfinale
 ct_boss2:       I90, G70, savethem, metamorphosis, grandfinale, catastrophe
@@ -79,6 +80,7 @@ ff9_home:       prelude*2, awakening, relm, rachel, daryl, grandfinale, town_rui
 ff9_memoria:    forest, train, espers*2, ruin, omen3
 ff9_messenger:  kefka, gestahl, grandfinale, catastrophe, fanatics, omen3, dmad5
 ffx_ambition:   train, zozo, owzer, fanatics, catastrophe
+ffx_battle:     I55, G10, battle, savethem
 ffx_decision:   prelude, awakening, relm, town, martiallaw, town_ruin
 ffx_zanarkand:  prelude, coin, daryl, celes, town_ruin, ruin, omen3
 ffmq_battle1:   I50, G40, unforgiven, magitek, battle, boss
@@ -138,6 +140,7 @@ sd2_thunder:    setzer, johnny, martiallaw, mountain, zozo, moogles, blackjack
 sd2_tomorrow:   I45, G65, cyan, locke, savethem, grandfinale, mountain, unforgiven, floatingcont, catastrophe, boss
 sd2_town:       relm, johnny, town*2
 sd2_wish:       coin, forest*2, train, ruin*2, prelude
+sd3_angels:     prelude, omen3, awakening, rachel, relm, espers
 sd3_paths:      balance, shadow, strago, gau, cyan, locke, setzer, daryl, celes, forest, mountain, serpent
 sdlm_nostalgic:  prelude, awakening, gau, rachel, daryl, celes, forest, town_ruin, omen3
 sd1s_boss:      I70, G45, magitek, floatingcont, kefkastower
