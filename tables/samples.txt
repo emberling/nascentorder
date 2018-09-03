@@ -50,7 +50,7 @@
 6F: tr19_eguitar,   1E06, D28A, F 3 3  0
 70: tr3a_synbass,   E30D, E05A, F 7 7  0
 71: ts71_esnare,    9411, C000, F 7 7  0
-72: tr20_fhorn,     1F08, E05A, F 3 2  0 
+72: actr_trumpet,   2F04, D6B0, F 7 7  8
 73: tr21_ehorn,     721E, E05A, F 0 2  0
 74: tr0f_clarinet,  EB02, E05A, F 1 5  0
 75: f508_timpani,   9411, FB00, F 7 7  0
