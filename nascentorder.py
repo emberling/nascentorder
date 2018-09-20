@@ -1,5 +1,5 @@
-VERSION = "WIP 0.2.0"
-DEBUG = True
+VERSION = "0.2.0"
+DEBUG = False
 import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib, re, csv
 from copy import copy
 from string import maketrans
