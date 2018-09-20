@@ -1,3 +1,22 @@
+0.2.0:
+    -new mode: 'c' -- randomize character names, sprites, and portraits
+        This supersedes Beyond Chaos' 'partyparty makeover' mode.
+        All field sprites with walking animations are randomized.
+        Sprites without portraits use ghost if mode 'x' is not selected.
+    -new mode: 'i' -- imports a custom instrument set, greatly expanding
+        the versatility and range of custom music
+    -changed mode: 'b' -- this now assigns music based on location rather
+        than enemy level, with earlier locations receiving higher priority.
+        The location breakdown is: World of Balance overworld encounters,
+        World of Balance dungeon encounters, all event battles, World of
+        Ruin overworld encounters, World of Ruin dungeon encounters.
+        - The keyword 'ONEWINGEDLEAFER' engages the old behavior.
+        - Also fixed a bug that was resulting in incorrect song assignment.
+    -'n' -- class names are now loaded from custom/SpriteImports.txt instead
+        of hardcoded
+    -'m' -- now randomizes individual sections of tier boss music
+    -'m' -- now loads MML files via mfvitools instead of raw binary data
+    
 0.1.0:
     -new mode: 'x' -- generates portraits based on sprites. this draws from the top 16x16 of the battle ready pose, or bottom 16x16 if the top 8 pixel rows of the pose are empty. by default, only portraits which fulfill one of these criteria will be replaced:
         - is a portrait from the base game, but the sprite it is applied to is not that character's original sprite, nor a known variation

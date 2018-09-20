@@ -1,3 +1,13 @@
 # pointer locations to load if tsushiy instrument patch is detected
 [MusicPtr]
+# start and end location for BRR pointers
 brrpointers: 53C5F, 53DF3
+
+# start and end location for instrument loop info
+brrloops: 351E10, 351F1D
+
+# start and end location for instrument pitch info
+brrpitch: 351F20, 35202D
+
+# start and end location for instrument ADSR info
+brradsr: 352030, 35213D

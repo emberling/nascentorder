@@ -1,6 +1,6 @@
 Nascent Order for Final Fantasy VI
 a supplemental randomizer by emberling
-version 0.1.0a   (alpha -- expect brokenness)
+version 0.2.0
 
 The main goal of this project is to build on top of FF6 Beyond Chaos to create
 the randomized experience that most appeals to me. I'm fascinated by randomly
@@ -35,47 +35,51 @@ personally, so here we are.
 
 So far, NaO does these things:
     - Music randomizer
-        - imports external music from data files (included)
+        - imports external music from MML files (included)
         - shuffles music appropriately (or inappropriately, if desired)
-        - adds four additional battle songs
-        - assigns battle and boss music roughly based on difficulty (enemy level)
-
-On the horizon / works currently in progress:
+        - adds four additional slots for battle songs
+            by default, this creates a different battle theme for WoB
+            (outside and inside), WoR (outside and inside), and event battles.
+        - Largely preserves music-format SFX used in WoR, train, zozo
+        - Final boss music randomizer: shuffles and replaces the three
+            individual parts of the first Dancing Mad track (three tiers)
+    - Instrument sample expansion
+        Adds a variety of new instruments for enhanced imported music.
     - Character palette rework
         Should be both more vivid and more consistent/less glitchy than BC.
-        Includes skintone randomization from a curated list of possibilities
-        Will include repalettings of a few problematic default sprites, if present
-        Figaro twins match; The General uses the same palette in or out of chains.
-    - Pixelated portrait mode
-        If activated, generates portraits based on the top 16x16 of battle "ready" sprite.
-        This matches the character's palette.
-        Bottom 16x16 used if top 16x16 is empty.
-        Possible to replace all portraits or to only replace stock FF6 portraits applied
-        to sprites other than their original sprite.
-    - Assign battle music tiers based on location
-    - Many more song imports to come
+        - Includes skintone randomization from a curated list of possibilities
+        - Some default sprites require minor adjustments to work well with this
+        mode, these are automatically applied.
+        - Consistency maintained for some palettes that should logically match
+    - Pixel portrait mode
+        To solve the problem of custom sprites lacking functional portraits,
+        this automatically generates serviceable portraits from the sprite
+        itself. By default replaces only portraits that appear to be
+        placeholders; configurable to replace all portraits.
+    - Field sprite randomizer
+        A slightly more advanced version of BC's 'partyparty makeover'.
+        All playable characters and all NPCs with walking animations are
+        randomized from a pool of custom and original sprites. Constraints
+        are used so that the new set of sprites generally matches the story
+        and function of the original.
+        Character names are also randomized.
+        CtrlxZ's v1.5 sprite pack is included, plus a few extra.
+    - misc. tweaks
+        Optionally change BC's "original character name" field to a class name.
+        
+On the horizon / work currently in progress:
+    - Enemy sprite randomizer
+        Including custom sprites. Various enemy properties and effects should
+        be inferrable from the chosen graphics, as they are in a non-randomized
+        game: e.g., flying.
+    - Field sprite randomizer improvements
+        Decoupling NPCs that use the same sprite with different palettes
 
 Future plans:
-    - Save last used modes as default; allow setting a few quick-select mode sets
-    - Automatically import Tsushiy instrument patch for better sounding music
-    - Incorporate various improvement patches to character abilities
-        (rage, dance, swdtech, runic/retort)
-    - Full sprite randomization/import as in BC, with more constraints available
-    - Script edits to reflect random characters' gender and some other things
-    - Could it be that "Rage" is the key to winning this war?
-        The Empire is really interested in The Witch for some reason.
-        It should reflect an ability she actually has!
-    - General de-trolling, changing things that randomly flat-out kill you into
-      things that are dangerous, but avoidable without such drastic measures as
-      "don't open chests" or "don't cast spells on enemies" or "don't ever use
-      my cool nuke ability unless I'm going to die anyway."
-
-Other stuff I'm experimenting with, tentatively:
-    - Item rework to be more varied and more casual friendly than BC
-        (fewer evade penalties, more variety in types and bonuses)
-    - Random spells and effects, if I can make it work
-    
-    I may also try to port my constraints-based spell palette mod from
-    my v63 BC edit, but I never really finished it, and the full random
-    spells mode would obsolete it IF I manage to get that off the ground.
-    
+    - Additional song slots for e.g. a true "hurry!" or "dungeon" track
+    - Adjust script to reflect randomizations, e.g. pronouns
+    - Optional balance tweaks, aimed at eliminating the recurring BC mechanic
+        of things that seem cool but have a small but inevitable chance to
+        flat out kill you. 
+    - Items, and spell effects
+    - Formula and ability adjustments to better support above

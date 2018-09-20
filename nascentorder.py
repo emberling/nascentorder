@@ -1,35 +1,46 @@
-VERSION = "0.1.0a"
-DEBUG = True
-import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib, re
+VERSION = "0.2.0"
+DEBUG = False
+import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib, re, csv
 from copy import copy
 from string import maketrans
 
+from mml2mfvi import mml_to_akao
+
 HIROM = 0xC00000
-defaultmode = 'bmx'
+defaultmode = 'bcinmpx'
 CONFIG_DEFAULTS = {
         'modes': defaultmode,
+        'free_rom_space': '310000-3FFFFF',
         'skip_hack_detection': 'False',
         'allow_music_repeats': 'False',
         'field_music_chance': '0',
         'preserve_song_data': 'False',
-        'battle_music_lookup': 'battle1, boss1, boss2, battle2, battle3, 3B, battle4, battle5',
-        'battle_music_ids': '24, new, new, new, new',
-        'boss_music_ids': '14, 33',
-        'pause_current_song': 'battle1, battle2, battle3, battle4, battle5',
+        'battle_music_lookup': 'battle1, boss2, boss3, battle2, battle3, 3B, battle4, boss1',
+        'battle_music_ids': '24, new, new, new',
+        'boss_music_ids': 'new, 14, 33',
+        'pause_current_song': 'battle1, battle2, battle3, battle4, boss1',
         'romsize': '300000, 400200',
         'monsters_loc': 'F0000, F2FFF',
         'monsters_size': '20',
         'forms_loc': 'F6200, F83FF',
-        'forms_size': '15',
+        'forms_size': 'F',
+        'forms_count': '240',
         'forms_aux': 'F5900, F61FF',
         'forms_aux_size': '4',
         'songcount': '53C5E',
         'brrpointers': '53C5F, 53D1B',
+        'brrloops': '53D1C, 53D99',
+        'brrpitch': '53D9A, 53E17',
+        'brradsr': '53E18, 53E95',
         'songpointers': '53E96, 53F94',
         'instruments': '53F95, 54A34',
+        'brrpointerpointer': '50222, 50228, 5022E',
+        'brrlooppointer': '5041C',
+        'brrpitchpointer': '5049C',
+        'brradsrpointer': '504DE',
         'songpointerpointer': '50538',
         'instrumentpointer': '501E3',
-        'songdata': '85C7A, 9FDFF, 352200',
+        'songdata': '85C7A, 9FDFF',
         'pausesongs': '506F9, 506FD',
         'battlesongs': '2BF3B, 2BF42',
         'spritesheet': '150000',
@@ -50,9 +61,11 @@ DEFAULT_DEFAULTS = {
         'lastfile': 'ff6.smc'
         }
         
+FLAGS = set()
 spoiler = {}
 f_tellmewhy = False
 npcdb = {}
+freespace = None
 
 def dprint(msg):
     if DEBUG: print msg
@@ -111,21 +124,180 @@ def printspoiler(f, seed):
         line(separator)
         for t in spoiler['Music']:
             line(t)
+        line('\n')
+    handled.append('Characters')
+    if 'Characters' in spoiler:
+        line("CHARACTERS")
+        line(separator)
+        for t in spoiler['Characters']:
+            line(t)
+        line('\n')
     handled.append('Debug')
+    if 'ROM Map' in spoiler:
+        line("ROM MAP")
+        line(separator)
+        for t in spoiler['ROM Map']:
+            line(t)
+        line('\n')
+    handled.append('ROM Map')
     if DEBUG and 'Debug' in spoiler:
         line()
         line("DEBUG")
         line(separator)
         for t in spoiler['Debug']:
             line(t)
+        line('\n')
     for k in [sk for sk in spoiler if sk not in handled]:
         line()
         line(k)
         line(separator)
         for t in spoiler[k]:
             line(t)
+        line('\n')
 
+#find an empty space in ROM for some data
+def put_somewhere(romdata, newdata, desc, f_silent=False):
+    global freespace, spoiler
+    if freespace is None:
+        init_freespace()
+    success = False
+    for i, (start, end) in enumerate(freespace):
+        room = end-start
+        if room < len(newdata):
+            continue
+        else:
+            romdata = byte_insert(romdata, start, newdata)
+            freespace[i] = (start+len(newdata), end)
+            if 'ROM Map' not in spoiler: spoiler['ROM Map'] = []
+            spoiler['ROM Map'].append("  0x{:x} -- {}".format(start, desc))
+            success= True
+            break
+    if not success:
+        if not silent: print "ERROR: not enough free space to insert {}\n\n".format(desc)
+        assert False
+    return (romdata, start, end)
             
+def init_freespace():
+    global freespace
+    fs = CONFIG.get('General', 'free_rom_space').split()
+    freespace = []
+    while not freespace:
+        for t in fs:
+            if '-' not in t: continue
+            try:
+                start, end = [int(n,16) for n in t.split('-')[0:2]]
+            except ValueError:
+                continue
+            if start >= end: continue
+            freespace.append((start, end))
+        if not freespace:
+            to_default('free_rom_space')
+            continue
+        break
+
+def free_space(start, end):
+    global freespace
+    if freespace is None:
+        init_freespace()
+    freespace.append((start, end))
+    
+    newfs = []
+    for i, (start, end) in enumerate(sorted(freespace)):
+        if newfs:
+            laststart, lastend = newfs[-1][0], newfs[-1][1]
+            if start <= lastend + 1:
+                newfs[-1] = (laststart, end)
+            else:
+                newfs.append((start, end))
+        else:
+            newfs.append((start, end))
+    freespace = newfs
+
+def claim_space(startc, endc):
+    global freespace
+    if freespace is None: return
+    if startc > endc: return
+    newfs = []
+    for i, (start, end) in enumerate(sorted(freespace)):
+        if startc <= start and endc >= end:
+            pass
+        elif startc <= start and endc >= start:
+            newstart = endc+1
+            if newstart < end:
+                newfs.append((newstart, end))
+        elif startc <= end and endc >= end:
+            newend = startc-1
+            if newend > start:
+                newfs.append((start, newend))
+        elif startc >= start and endc <= end:
+            newend = startc-1
+            newstart = endc+1
+            if newend > start:
+                newfs.append((start, newend))
+            if newstart > end:
+                newfs.append((newstart, end))
+        else:
+            newfs.append((start, end))
+    freespace = newfs
+    
+#expects tag/req pairs encased in longer iterables, for some reason.
+#why? i have no idea, and i wrote this two days ago. *shrug*
+def constraint_filter(choices, choices_idx, given, given_idx=0):
+    while len(given) < given_idx+2:
+        given.append([])
+    tags = given[given_idx]
+    if isinstance(tags, str):
+        tags = tags.split(' ')
+    tags = [s.strip() for s in tags if len(s.strip())]
+    constraints = given[given_idx+1]
+    if isinstance(constraints, str):
+        constraints = constraints.split(' ')
+    constraints = [s.strip() for s in constraints if len(s.strip()) > 1]
+    mustbe = [s[1:] for s in constraints if s[0] == '+']
+    mustnot = [s[1:] for s in constraints if s[0] == '-']
+    choices = list(choices)
+    for i, c in enumerate(choices):
+        c = list(c)
+        while len(choices[i]) < choices_idx+2:
+            c.append([])
+        if isinstance(c[choices_idx], str):
+            c[choices_idx] = c[choices_idx].split(' ')
+        c[choices_idx] = [s.strip() for s in c[choices_idx] if len(s.strip())]
+        if isinstance(c[choices_idx+1], str):
+            c[choices_idx+1] = c[choices_idx+1].split(' ')
+        c[choices_idx+1] = [s.strip() for s in c[choices_idx+1] if len(s.strip()) > 1]
+        choices[i] = c
+        
+    newchoices = []
+    for c in choices:
+        ctags = c[choices_idx]
+        cmustbe = [s[1:] for s in c[choices_idx+1] if s[0] == '+']
+        cmustnot = [s[1:] for s in c[choices_idx+1] if s[0] == '-']
+        mightwork = True
+        for m in mustbe:
+            if m not in ctags:
+                mightwork = False
+                break
+        if not mightwork: continue
+        for m in mustnot:
+            if m in ctags:
+                mightwork = False
+                break
+        if not mightwork: continue
+        for m in cmustbe:
+            if m not in tags:
+                mightwork = False
+                break
+        if not mightwork: continue
+        for m in cmustnot:
+            if m in tags:
+                mightwork = False
+                break
+        if not mightwork: continue
+        newchoices.append(c)
+    return newchoices
+    
+    
 # palette utilities. all of these are "good enough" approximates.
 # don't expect to translate from one to the other and back w/o lossiness
 char_hues = [ 0, 15, 30, 45, 60, 75, 90, 120, 150, 165, 180, 210, 240, 270, 300, 315, 330, 360 ]
@@ -236,7 +408,18 @@ def process_misc_fixes(data_in):
         #data = byte_insert(data, loc, "\xFF" * 0x70, end=0x30084A)
         classdata = "\xFF" * 0x70
         classes = ["Witch", "Hunter", "Knight", "Merc", "Ruler", "Bear", "Genrl.",
-                "Sage", "Artist", "Gamblr", "Moogle", "Feral", "Enigma", "Yeti"]
+                "Sage", "Artist", "Pilot", "Moogle", "Feral", "Enigma", "Beast"]
+        charcfg = ConfigParser.ConfigParser()
+        charcfg.read(os.path.join("custom", "SpriteImports.txt"))
+        for k, v in charcfg.items("Characters"):
+            try:
+                if int(k, 16) < len(classes):
+                    classes[int(k,16)] = v.split(',')[0].strip()
+            except:
+                pass
+        #for i, c in enumerate(classes):
+        #    if hex(i)[2:] in charcfg:
+        #        classes[i] = charcfg[hex(i)[2:].split(',')[0].strip()]
         for i, c in enumerate(classes):
             classdata = byte_insert(classdata, i*8, classes[i].translate(TO_BATTLETEXT), 6)
         data = byte_insert(data, loc, classdata, end=o_end)
@@ -280,6 +463,257 @@ def process_sprite_fixes(data_in):
         #os.path.join("music", s.changeto + "_inst.bin"
         
     return data
+
+def unfuck_portraits(data, f_merchant=False):
+    #clean up the bizarre mess BC leaves in portrait setup
+    o_portptrs = 0x036F00
+    o_portraits = 0x2D1D00
+
+    loc = o_portptrs
+    pt = (range(0, 0x10) + ([0xE] if f_merchant else [0x10]) + [0x11, 0] +
+            ([0x10] if f_merchant else [1]) + [0x12, 0, 0, 0, 0, 0, 6])
+    porttable = "".join(map(chr, pt))
+    for i in xrange(0,0x1B):
+        porttable = int_insert(porttable, len(porttable), 0x320*pt[i], 2)
+    data = byte_insert(data, loc, porttable, 0x4F)
+    
+    return data
+    
+    
+def process_sprite_imports(data_in):
+    
+    o_charnames = 0x478C0
+    o_sprites = 0x150000
+    l_fullsprite = 0x16A0
+    o_portraits = 0x2D1D00
+    o_portpals = 0x2D5860
+    
+    spritecfg = ConfigParser.ConfigParser()
+    spritecfg.read(os.path.join("custom", "SpriteImports.txt"))
+    sizecfg = ConfigParser.ConfigParser()
+    sizecfg.read(os.path.join("tables", "spritesizes.txt"))
+    allnames = {"female": set(), "neutral": set(), "male": set()}
+    
+    try:
+        with open(os.path.join("custom", "FemaleNames.txt"), "r") as nf:
+            for line in nf:
+                line = "".join([s for s in line if s.isalpha()])
+                if len(line) > 6: line = line[:6]
+                allnames['female'].add(line)
+        with open(os.path.join("custom", "NeutralNames.txt"), "r") as nf:
+            for line in nf:
+                line = "".join([s for s in line if s.isalpha()])
+                allnames['neutral'].add(line)
+        with open(os.path.join("custom", "MaleNames.txt"), "r") as nf:
+            for line in nf:
+                line = "".join([s for s in line if s.isalpha()])
+                allnames['male'].add(line)
+    except IOError:
+        print "ERROR: Could not open potential list of character names\n\n\n"
+        assert False
+        
+    class Actor:
+        def __init__(self, id, desc=None, gender="any", size="full", tags="", reqs=""):
+            self.id, self.desc, self.gender, self.size, self.tags, self.reqs = id, desc, gender, size, tags, reqs
+            if desc is None:
+                self.name = "Sprite {}".format(id)
+        def __repr__(self):
+            return repr(vars(self))
+            
+    class Sprite:
+        def __init__(self, name, gender, size, file, uniqueid="", tags="", reqs=""):
+            self.name, self.gender, self.size, self.file, self.uniqueid, self.tags, self.reqs = name, gender, size, file, uniqueid, tags, reqs
+        def __repr__(self):
+            return repr(vars(self))
+    
+    class SpriteType:
+        def __init__(self, string):
+            params = string.split()
+            datamap = []
+            self.size = 0
+            for p in params:
+                if '-' in p:
+                    pq = p.split('-')
+                    start = int(pq[0],16) * 0x20
+                    end = (int(pq[1],16)+1) * 0x20
+                else:
+                    start = int(p,16) * 0x20
+                    end = start + 0x20
+                datamap.append((start, end))
+                self.size += (end - start)
+            self.map = datamap
+        def __repr__(self):
+            return "({} bytes: {})".format(self.size, self.map)
+        
+        def build(self, spritesheet):
+            newsheet = ""
+            for m in self.map:
+                newsheet += spritesheet[m[0]:m[1]]
+            return newsheet
+        
+    def spoil(txt):
+        global spoiler
+        if 'Characters' not in spoiler: spoiler['Characters'] = []
+        spoiler['Characters'].append(txt)
+           
+    #sizedb = {
+    #    "full": l_fullsprite,
+    #    "nr": l_fullsprite - 320
+    #    }
+        
+    # parse config into actorlist & spritelist
+    allactors, allsprites = [], []
+    for k, v in spritecfg.items("Characters"):
+        line = [s.strip() for s in v.split(',')]
+        while len(line) < 5: line.append([])
+        allactors.append(Actor(k, *line))
+    for k, v in spritecfg.items("Sprites"):
+        line = [s.strip() for s in v.split(',')]
+        while len(line) < 6: line.append([])
+        allsprites.append(Sprite(k, *line))
+    
+    soffsets, sizedb, spritemap = {}, {}, {}
+    for k, v in sizecfg.items("Offsets"):
+        try:
+            soffsets[int(k,16)] = int(v,16)
+        except ValueError:
+            print "WARNING: unparseable sprite offset {}:{}".format(k,v)
+    for k, v in sizecfg.items("SizeTypes"):
+        stype = SpriteType(v)
+        sizedb[k] = stype.size
+        spritemap[k] = stype
+    
+    data_in = unfuck_portraits(data_in)
+    
+    iterations = 0
+    while True:
+        uniqueids_used, sprites_used, initials_used = set(), set(), set()
+        data = data_in
+        spritepos = o_sprites
+        retry = False
+        spoilertxt = []
+        for a in allactors: 
+            id = int(a.id, 16) 
+            # constraints & purge dupes
+            spriteopts = constraint_filter([(s, s.tags, s.reqs) for s in allsprites], 1, (a.tags, a.reqs))
+            spriteopts = [s[0] for s in spriteopts if s[0].uniqueid not in uniqueids_used and s[0].name not in sprites_used]
+            #assign gender & name
+            if a.gender not in ["female", "male", "neutral"]:
+                a.gender = rng.choice(["female"]*9 + ["male"]*9 + ["neutral"]*2)
+            spriteopts = [s for s in spriteopts if s.gender == a.gender or (s.gender == "neutral" and rng.choice([True, False]))]
+            if not spriteopts:
+                retry = True
+                break
+            if id <= 13:
+                nameopts = set([n for n in allnames[a.gender] if n[0] not in initials_used])
+                for n in allnames["neutral"]:
+                    if n[0] not in initials_used and rng.choice([True, False]):
+                        nameopts.add(n)
+                if not nameopts:
+                    retry = True
+                    break
+                a.name = rng.choice(list(nameopts))
+                initials_used.add(a.name[0])
+            #check filesize (nyi, everything is full size atm)
+            thissprite = rng.choice(spriteopts)
+            #print "{}: {} out of {}".format(a.desc, thissprite.name, [s.name for s in spriteopts])
+            try:
+                size = sizedb[a.size]
+            except ValueError:
+                print "WARNING: actor {} has invalid size {}. Cannot make sprite changes past this point."
+                retry = False
+                break
+            #read image data
+            filename = os.path.join("sprites", thissprite.file + ".bin")
+            try:
+                with open(filename, "rb") as sf:
+                    sdata = sf.read()
+                if len(sdata) < size: raise IOError
+            except IOError:
+                print "WARNING: invalid spritesheet {}. Rerolling sprites...".format(filename)
+                retry = True
+                break
+            filename = os.path.join("sprites", thissprite.file + "-P.bin")
+            if 'pixelparty' in FLAGS or (id >= 18 and id != 20):
+                pdata, ppal = None, None
+            else:
+                try:
+                    with open(filename, "rb") as pf:
+                        pdata = pf.read()
+                    if len(pdata) < 0x320: raise IOError
+                except IOError:
+                    try:
+                        filename = os.path.join("sprites", thissprite.uniqueid + "-P.bin")
+                        with open(filename, "rb") as pf:
+                            pdata = pf.read()
+                        if len(pdata) < 0x320: raise IOError
+                    except IOError:
+                        pdata = None
+                if pdata:
+                    #filename = os.path.join("sprites", thissprite.file + "-P.pal")
+                    filename = filename[:-3] + "pal"
+                    try:
+                        with open(filename, "rb") as pp:
+                            ppal = pp.read()
+                        if len(ppal) < 0x20: raise IOError
+                    except IOError:
+                        ppal = None
+            if pdata is None: #alternate fallback mode
+                try:
+                    filename = os.path.join("sprites", "fixes", "fallback-portrait.bin")
+                    with open(filename, "rb") as pf:
+                        pdata = pf.read()
+                    if len(pdata) < 0x320: raise IOError
+                    filename = filename[:-3] + "pal"
+                    with open(filename, "rb") as pp:
+                        ppal = pp.read()
+                    if len(ppal) < 0x20: raise IOError
+                except IOError:
+                    pdata = "\x00"*0x320
+                
+            
+            if a.desc == "Figaro Guard":
+                rdata = spritemap['onlyride'].build(sdata)
+                pdata = spritemap['onlyprone'].build(sdata)
+                data = byte_insert(data, soffsets[0x40], rdata)
+                data = byte_insert(data, soffsets[0x52], pdata)
+                
+            sdata = spritemap[a.size].build(sdata)
+            
+            #write
+            if id <= 13:
+                romname = a.name.translate(TO_BATTLETEXT)
+                while len(romname) < 6: romname = romname + "\xFF"
+                if len(romname) > 6: romname = romname[:6]
+                data = byte_insert(data, o_charnames + 6*int(a.id, 16), romname, 6)
+            pid = 18 if id == 20 else id
+            if pid <= 18 and pdata and ppal and 'pixelparty' not in FLAGS:
+                loc = o_portraits + pid * 0x320
+                data = byte_insert(data, loc, pdata, 0x320)
+                loc = o_portpals + pid * 0x20
+                data = byte_insert(data, loc, ppal, 0x20)
+            loc = soffsets[id]
+            data = byte_insert(data, loc, sdata, size)
+            #data = byte_insert(data, spritepos, sdata, size)
+            #spritepos += size
+            sprites_used.add(thissprite.name)
+            if thissprite.uniqueid:
+                uniqueids_used.add(thissprite.uniqueid)
+            if hasattr(a, 'name'):
+                spoilertxt.append("{} ({}) -> {} ({})".format(id, a.desc, a.name, thissprite.name))
+            else:
+                spoilertxt.append("{} ({}) ---> {}".format(id, a.desc, thissprite.name))
+        if iterations >= 1000:
+            print "ERROR: Couldn't generate a sprite configuration that fits the chosen constraints!"
+            print "You may need to add more sprites, lower some restrictions, or remove actors from randomization\n\n\n\n"
+            assert False
+        if retry == False:
+            break
+        raw_input("\nSomething failed. Retrying..")
+    for line in spoilertxt:
+        spoil(line)
+    return data
+    
     
 def process_npcdb(data_in, f_sprites=False):
     print "** Processing NPCs ..."
@@ -366,14 +800,16 @@ def process_actor_events(data_in):
         if cmd == "\x37":
             actor, graphic = ord(edata[loc+1]), ord(edata[loc+2])
 #            print "{}: assign graphic {} to actor {}".format(hex(loc), hex(graphic), hex(actor)
-            actorsprites[actor] = graphic
+            if actor < len(actorsprites):
+                actorsprites[actor] = graphic
         elif cmd == "\x43":
             actor, palette = ord(edata[loc+1]), ord(edata[loc+2])
 #            print "{}: assign palette {} to actor {}".format(hex(loc), hex(palette), hex(actor)
-            if (actorsprites[actor], palette) in npcdb:
-                edata = int_insert(edata, loc+2, npcdb[(actorsprites[actor], palette)][1], 1)
-            else:
-                pass#dprint("note: in event {} set palette {} to actor {} using sprite {}".format(hex(start+o_eventstart), palette, actor, actorsprites[actor]))
+            if actor < len(actorsprites):
+                if (actorsprites[actor], palette) in npcdb:
+                    edata = int_insert(edata, loc+2, npcdb[(actorsprites[actor], palette)][1], 1)
+                else:
+                    pass#dprint("note: in event {} set palette {} to actor {} using sprite {}".format(hex(start+o_eventstart), palette, actor, actorsprites[actor]))
         elif cmd == "\xFE":
 #            print "end of event {} ~ {}".format(hex(start+o_eventstart), hex(loc+o_eventstart))
             start = loc + 1
@@ -429,7 +865,7 @@ def process_char_palettes(data_in, f_cel, f_rave):
     twinpal = rng.randint(0,5)
     char_palettes_forced = range(0,6) + range(0,6)
     char_palettes_forced.remove(twinpal)
-    char_palettes_forced.append(random.choice(range(0,twinpal)+range(twinpal+0,6)))
+    char_palettes_forced.append(rng.choice(range(0,twinpal)+range(twinpal+0,6)))
     while char_palettes_forced[0] == twinpal or char_palettes_forced[1] == twinpal:
         rng.shuffle(char_palettes_forced)
     sprite_palettes = char_palettes_forced[:4] + [twinpal, twinpal] + char_palettes_forced[4:]
@@ -506,13 +942,13 @@ def process_char_palettes(data_in, f_cel, f_rave):
     def nudge_hue(hue): #designed for 'pure' hue: one 31, one 0, one anything
         new_color = hue[:]
         if len([h for h in hue if h not in [0, 31] ]) > 0:
-            new_color = [(h if h in [0,31] else h + random.randint(-2,2)) for h in hue]
+            new_color = [(h if h in [0,31] else h + rng.randint(-2,2)) for h in hue]
         elif len([h for h in hue if h == 31]) >= 2:
-            nudge_idx = random.choice([i for i, h in enumerate(hue) if h == 31])
-            new_color[nudge_idx] -= random.randint(0,3)
+            nudge_idx = rng.choice([i for i, h in enumerate(hue) if h == 31])
+            new_color[nudge_idx] -= rng.randint(0,3)
         elif 0 in hue:
-            nudge_idx = random.choice([i for i, h in enumerate(hue) if h == 0])
-            new_color[nudge_idx] += random.randint(0,3)
+            nudge_idx = rng.choice([i for i, h in enumerate(hue) if h == 0])
+            new_color[nudge_idx] += rng.randint(0,3)
         new_color = [(c if c <= 31 else 31) for c in new_color]
         new_color = [(c if c >= 0 else 0) for c in new_color] # just in case
         return new_color
@@ -658,7 +1094,117 @@ def process_char_palettes(data_in, f_cel, f_rave):
     
     return data
         
-def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglist):
+def insert_instruments(data_in):
+    data = data_in
+    print "** Inserting extended instrument samples ..."
+    samplecfg = ConfigParser.ConfigParser()
+    samplecfg.read(os.path.join('tables', 'samples.txt'))
+        
+    #pull out instrument infos
+    sampleptrs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brrpointers').split(',')]
+    if len(sampleptrs) != 2: sampleptrs = to_default('brrpointers')
+    ptrdata = data[sampleptrs[0]:sampleptrs[1]+1]
+    #free_space(sampleptrs[0], sampleptrs[1])
+    
+    looplocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brrloops').split(',')]
+    if len(looplocs) != 2: looplocs = to_default('brrloops')
+    loopdata = data[looplocs[0]:looplocs[1]+1]
+    #free_space(looplocs[0], looplocs[1])
+    
+    pitchlocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brrpitch').split(',')]
+    if len(pitchlocs) != 2: pitchlocs = to_default('brrpitch')
+    pitchdata = data[pitchlocs[0]:pitchlocs[1]+1]
+    #free_space(pitchlocs[0], pitchlocs[1])
+    
+    adsrlocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brradsr').split(',')]
+    if len(adsrlocs) != 2: adsrlocs = to_default('brradsr')
+    adsrdata = data[adsrlocs[0]:adsrlocs[1]+1]
+    #free_space(adsrlocs[0], adsrlocs[1])
+    
+    for id, smp in samplecfg.items('Samples'):
+        id = int(id, 16)
+        
+        inst = [i.strip() for i in smp.split(',')]
+        if len(inst) < 4:
+            print "WARNING: malformed instrument info '{}'".format(smp)
+            continue
+        name, loop, pitch, adsr = inst[0:4]
+        filename = name + '.brr'
+        
+        try:
+            with open(os.path.join('samples', filename), 'rb') as f:
+                sdata = f.read()
+        except IOError:
+            print "WARNING: couldn't load sample file {}".format(filename)
+            continue
+        
+        try:
+            loop = chr(int(loop[0:2], 16)) + chr(int(loop[2:4], 16))
+        except (ValueError, IndexError):
+            print "WARNING: malformed loop info in '{}', using default".format(smp)
+            loop = "\x00\x00"
+        try:
+            pitch = chr(int(pitch[0:2], 16)) + chr(int(pitch[2:4], 16))
+        except (ValueError, IndexError):
+            print "WARNING: malformed pitch info in '{}', using default".format(smp)
+            pitch = "\x00\x00"
+        if adsr:
+            try:
+                attack, decay, sustain, release = [int(p,16) for p in adsr.split()[0:4]]
+                assert attack < 16
+                assert decay < 8
+                assert sustain < 8
+                assert release < 32
+                ad = 1 << 7
+                ad += decay << 4
+                ad += attack
+                sr = sustain << 5
+                sr += release
+                adsr = chr(ad) + chr(sr)
+            except (AssertionError, ValueError, IndexError):
+                print "WARNING: malformed ADSR info in '{}', disabling envelope".format(smp)
+                adsr = "\x00\x00"
+        else:
+            adsr = "\x00\x00"
+            
+        data, s, e = put_somewhere(data, sdata, "(sample) [{:02x}] {}".format(id, name))
+        ptrdata = int_insert(ptrdata, (id-1)*3, s + HIROM, 3)
+        loopdata = byte_insert(loopdata, (id-1)*2, loop, 2)
+        pitchdata = byte_insert(pitchdata, (id-1)*2, pitch, 2)
+        adsrdata = byte_insert(adsrdata, (id-1)*2, adsr, 2)
+        
+    #data, s, e = put_somewhere(data, ptrdata, "POINTERS TO INSTRUMENT BRR DATA")
+    #CONFIG.set('MusicPtr', 'brrpointers', "{:x}, {:x}".format(s, e))
+    #locs = [int(st.strip(),16) for st in CONFIG.get('MusicPtr', 'brrpointerpointer').split(',')]
+    #print locs
+    #for i, l in enumerate(locs):
+    #    print "{:x} -> ".format(s+i+HIROM, l)
+    #    data = int_insert(data, l, s + i + HIROM, 3)
+    data = byte_insert(data, sampleptrs[0], ptrdata)
+    CONFIG.set('MusicPtr', 'brrpointers', "{:x}, {:x}".format(sampleptrs[0], sampleptrs[0]+len(data)))
+
+    data, s, e = put_somewhere(data, loopdata, "INSTRUMENT LOOP DATA")
+    CONFIG.set('MusicPtr', 'brrloops', "{:x}, {:x}".format(s, e))
+    loc = int(CONFIG.get('MusicPtr', 'brrlooppointer'),16)
+    data = int_insert(data, loc, s + HIROM, 3)
+    
+    data, s, e = put_somewhere(data, pitchdata, "INSTRUMENT PITCH DATA")
+    CONFIG.set('MusicPtr', 'brrpitch', "{:x}, {:x}".format(s, e))
+    loc = int(CONFIG.get('MusicPtr', 'brrpitchpointer'),16)
+    data = int_insert(data, loc, s + HIROM, 3)
+    
+    data, s, e = put_somewhere(data, adsrdata, "INSTRUMENT ADSR DATA")
+    CONFIG.set('MusicPtr', 'brradsr', "{:x}, {:x}".format(s, e))
+    loc = int(CONFIG.get('MusicPtr', 'brradsrpointer'),16)
+    data = int_insert(data, loc, s + HIROM, 3)
+    
+    return data
+                
+
+def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsonglist):
+    global freespace
+    data = data_in
+    freespacebackup = freespace
     print "** Processing random music ..." if f_randomize else "** Processing custom music ..."
     f_repeat = CONFIG.getboolean('Music', 'allow_music_repeats')
     f_preserve = CONFIG.getboolean('Music', 'preserve_song_data')
@@ -725,6 +1271,8 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         vals = [s.strip() for s in ss[1].split(',')]
         songtable[vals[0]] = SongSlot(int(ss[0],16), chance=int(vals[1]))
     
+    tierboss = dict(songconfig.items('TierBoss'))
+    
     # determine which songs change
     used_songs = []
     songs_to_change = []
@@ -780,6 +1328,14 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         battleids = [s.strip() for s in CONFIG.get('Music', 'battle_music_ids').split(',')]
         bossids = [s.strip() for s in CONFIG.get('Music', 'boss_music_ids').split(',')]
         newidx = 0
+        old_method = False if "battlebylevel" not in FLAGS else True
+        if not old_method:
+            if len(battleids) != 4 or len(bossids) != 3:
+                print "WARNING: Improper song ID configuration for default method (by area)"
+                print "     Falling back to old method (by level)"
+                old_method = True
+                FLAGS.append("battlebylevel")
+                
         for i, id in enumerate(battleids):
             if str(id).lower() == "new":
                 songtable['NaObattle' + str(newidx)] = SongSlot(nextsongid, chance=100)
@@ -797,45 +1353,94 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
                 newidx += 1
             else:
                 bossids[i] = int(id, 16)
+        claim_space(songptraddrs[0], songptraddrs[0] + 3*len(songtable))
         
         # what this is trying to do is:
         # we judge songs by pure INTENSITY or by combined INTENSITY and GRANDEUR
-        # old method:
-        # the lowest combined rating song is our first battle music
-        # the highest combined rating song is our last boss music
-        # remaining songs are separated by pure intensity into battle and boss
-        # new method: all songs separated by pure intensity into battle and boss
+        # old method: all songs separated by pure intensity into battle and boss
         # within these categories they are set in combined rating order
+        # new method: uses subsets of the I/G grid as pools for songs.
+        # 1. event-battle (boss0) is chosen from I>33, G<33
+        # 2. boss2 is chosen from I>min(boss0,60), G>66
+        # 3. boss1 is chosen from I>boss0, boss0<G<boss2
+        # 4. battle0 and battle1 chosen from I<boss0, G<max(50,boss1), sorted by G
+        # 5. battle2 and battle3 chosen from I<boss2, G>battle1
+        def intensity_subset(imin=0, gmin=0, imax=99, gmax=99):
+            return {k: v for k, v in intensitytable.items() if v[0] >= imin and v[0] <= imax and v[1] >= gmin and v[1] <= gmax and k not in used_songs}
+            
         battlecount = len(battleids) + len(bossids)
         while len(intensitytable) < battlecount:
             dprint("WARNING: not enough battle songs marked, adding random song to pool")
             newsong = rng.choice([k[0] for k in songconfig.items('Imports') if k not in intensitytable])
             intensitytable[newsong] = (rng.randint(0,9), rng.randint(0,9))
-        retry = True
-        while retry:
-            retry = False
-            battlechoices = rng.sample([(k, sum(intensitytable[k]), intensitytable[k][0]) for k in intensitytable.keys()], battlecount)
-            for c in battlechoices:
-                if battlechoices[0] in used_songs: retry = True
-        battlechoices.sort(key=operator.itemgetter(1))
-        battleprog = [None]*len(battleids)
-        bossprog = [None]*len(bossids)
-        #battleprog[0] = battlechoices.pop(0)
-        #bossprog[0] = battlechoices.pop(-1)
-        bosschoices = []
-        battlechoices.sort(key=operator.itemgetter(2))
-        for i in xrange(0, len(bossids)):
-            bosschoices.append(battlechoices.pop(-1))
-        bosschoices.sort(key=operator.itemgetter(1))
-        while None in bossprog:
-            bossprog[bossprog.index(None)] = bosschoices.pop(-1)
-        bossprog.reverse()
-        battlechoices.sort(key=operator.itemgetter(1))
-        while None in battleprog:
-            battleprog[battleprog.index(None)] = battlechoices.pop(0)
-        battleprog = [b[0] for b in battleprog]
-        bossprog = [b[0] for b in bossprog]
-        
+
+        if old_method:
+            retry = True
+            while retry:
+                retry = False
+                battlechoices = rng.sample([(k, sum(intensitytable[k]), intensitytable[k][0]) for k in intensitytable.keys()], battlecount)
+                for c in battlechoices:
+                    if battlechoices[0] in used_songs: retry = True
+            battlechoices.sort(key=operator.itemgetter(1))
+            battleprog = [None]*len(battleids)
+            bossprog = [None]*len(bossids)
+            #battleprog[0] = battlechoices.pop(0)
+            #bossprog[0] = battlechoices.pop(-1)
+            bosschoices = []
+            battlechoices.sort(key=operator.itemgetter(2))
+            for i in xrange(0, len(bossids)):
+                bosschoices.append(battlechoices.pop(-1))
+            bosschoices.sort(key=operator.itemgetter(1))
+            while None in bossprog:
+                bossprog[bossprog.index(None)] = bosschoices.pop(-1)
+            bossprog.reverse()
+            battlechoices.sort(key=operator.itemgetter(1))
+            while None in battleprog:
+                battleprog[battleprog.index(None)] = battlechoices.pop(0)
+            battleprog = [b[0] for b in battleprog]
+            bossprog = [b[0] for b in bossprog]
+        else:
+            tries=0
+            while True:
+                try:
+                    event, (ei, eg) = rng.choice(intensity_subset(imin=33, gmax=33).items())
+                    bt = min(ei,60) 
+
+                    super, (si, sg) = rng.choice(intensity_subset(imin=bt, gmin=66).items())
+                    boss, (bi, bg) = rng.choice(intensity_subset(imin=bt, gmin=eg, gmax=sg).items())
+                    wt = max(bg, 50)
+                    balance = rng.sample(intensity_subset(imax=bt, gmax=wt).items(), 2)
+                    if balance[0][1][0] + balance[0][1][1] > balance[1][1][0] + balance[1][1][1]:
+                        boutside, (boi, bog) = balance[1]
+                        binside, (bii, big) = balance[0]
+                    else:
+                        boutside, (boi, bog) = balance[0]
+                        binside, (bii, big) = balance[1]
+                    ruin = rng.sample(intensity_subset(imax=min(bi, si), gmin=max(bog,big)).items(), 2)
+                    if ruin[0][1][0] + ruin[0][1][1] > ruin[1][1][0] + ruin[1][1][1]:
+                        routside, (roi, rog) = ruin[1]
+                        rinside, (rii, rig) = ruin[0]
+                    else:
+                        routside, (roi, rog) = ruin[0]
+                        rinside, (rii, rig) = ruin[1]
+                    battleprog = [boutside, binside, routside, rinside]
+                    bossprog = [event, boss, super]
+                    if len(set(battleprog) | set(bossprog)) < 7:
+                        tries += 1
+                        continue
+                except IndexError as e:
+                    print "DEBUG: new battle prog mode failed {}rd attempt: {}".format(tries, e)
+                    raw_input("press enter to continue>")
+                    if tries >= 500:
+                        FLAGS.append("battlebylevel")
+                        print "WARNING: couldn't find valid configuration of battle songs by area."
+                        print "     Falling back to old method (by level)."
+                        return process_battleprog()
+                    else:
+                        tries += 1
+                        continue
+                break
+                    
         fightids = [(id, False) for id in battleids] + [(id, True) for id in bossids]
         for id, is_boss in fightids:
             for ident, s in songtable.items():
@@ -857,6 +1462,92 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
             return False
         return True
         
+    def process_mml(id, mml, name):
+        sfx = ""
+        if id == 0x29:
+            sfx = "sfx_zozo.mmlappend"
+        elif id == 0x4F:
+            sfx = "sfx_wor.mmlappend"
+        elif id == 0x20:
+            sfx = "sfx_train.mmlappend"
+            mml = re.sub("\{[^}]*?([0-9]+)[^}]*?\}", "$888\g<1>", mml)
+            for i in xrange(1,9):
+                if "$888{}".format(i) not in mml:
+                    mml = mml + "\n$888{} r;".format(i)
+        if sfx:
+            try:
+                with open(os.path.join('music', sfx), 'r') as f:
+                    mml += f.read()
+            except IOError:
+                print "couldn't open {}".format(sfx)
+                
+        return mml_to_akao(mml, name, True if (sfx and id != 0x29) else False)
+    
+    def process_tierboss(opts):
+        opts = [o.strip() for o in opts.split(',')]
+        attempts = 0
+        fallback = False
+        while True:
+            attempts += 1
+            if attempts >= 1000:
+                print "warning: check your tierboss config in songs.txt"
+                fallback = True
+                attempts = 0
+            retry = False
+            tiernames = rng.sample(opts, 3)
+            tierfiles = []
+            for n in tiernames:
+                try:
+                    with open(os.path.join('music', n + '_dm.mml'), 'r') as f:
+                        tierfiles.append(f.read())
+                except IOError:
+                    print "couldn't open {}".format(n + '_dm.mml')
+                    retry = True
+            if retry: continue
+            
+            mml = re.sub('[~!]', '', tierfiles[0])
+            mml = re.sub('[?_]', '?', mml)
+            mml = re.sub('j([0-9]+),([0-9]+)', 'j\g<1>,555\g<2>', mml)
+            mml = re.sub('([;:\$])([0-9]+)(?![,0-9])', '\g<1>555\g<2>', mml)
+            mml = re.sub('([;:])555444([0-9])', '\g<1>222\g<2>', mml)
+            mml = re.sub('#VARIANT', '#', mml)
+            mml = re.sub('{.*?}', '', mml)
+            mml = re.sub('\$555444([0-9])', '{\g<1>}', mml)
+            tierfiles[0] = mml
+            
+            mml = re.sub('[?!]', '', tierfiles[1])
+            mml = re.sub('[~_]', '?', mml)
+            mml = re.sub('j([0-9]+),([0-9]+)', 'j\g<1>,666\g<2>', mml)
+            mml = re.sub('([;:\$])([0-9]+)(?![,0-9])', '\g<1>666\g<2>', mml)
+            mml = re.sub('([;:])666444([0-9])', '\g<1>333\g<2>', mml)
+            mml = re.sub('\$666444([0-9])', '$222\g<1>', mml)
+            mml = re.sub('#VARIANT', '#', mml)
+            mml = re.sub('{.*?}', '', mml)
+            tierfiles[1] = mml
+            
+            mml = re.sub('[?_]', '', tierfiles[2])
+            mml = re.sub('[~!]', '?', mml)
+            mml = re.sub('j([0-9]+),([0-9]+)', 'j\g<1>,777\g<2>', mml)
+            mml = re.sub('([;:\$])([0-9]+)(?![,0-9])', '\g<1>777\g<2>', mml)
+            mml = re.sub('\$777444([0-9])', '$333\g<1>', mml)
+            mml = re.sub('#VARIANT', '#', mml)
+            mml = re.sub('{.*?}', '', mml)
+            tierfiles[2] = mml
+            
+            mml = "#VARIANT / \n#VARIANT ? ignore \n" + tierfiles[0] + tierfiles[1] + tierfiles[2]
+            
+            #with open('mydebug.mml', 'a+') as f:
+            #    f.seek(0,2)
+            #    f.write(mml)
+                
+            akao = mml_to_akao(mml, str(tiernames), variant='_default_')
+            inst = akao['_default_'][1]
+            akao = akao['_default_'][0]
+            if len(akao) >= 0x1000:
+                continue
+            break
+        return (akao, inst)
+        
     # choose replacement songs
     used_songs_backup = used_songs
     songtable_backup = songtable
@@ -867,6 +1558,8 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
     while keeptrying and attempts <= 1000:
         attempts += 1
         keeptrying = False
+        data = data_in
+        freespace = freespacebackup
         used_songs = copy(used_songs_backup)
         songtable = copy(songtable_backup)
         songs_to_change = copy(songs_to_change_backup)
@@ -878,16 +1571,19 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         f_moveinst = False if check_ids_fit() or f_preserve else True
         rng.shuffle(songs_to_change)
         for ident, s in songs_to_change:
-            choices = [c for c in songtable[ident].choices if c not in used_songs]
-            if not choices: choices.append(native_prefix + ident)
-            newsong = rng.choice(choices)
-            if (newsong in used_songs) and (not f_repeat):
-                #print "bounced setting {} as {}".format(newsong, ident)
-                keeptrying = True
-                break
+            if ident in tierboss:
+                songtable[ident].changeto = '!!tierboss'
             else:
-                if not f_repeat: used_songs.append(newsong)
-                songtable[ident].changeto = newsong if f_randomize else native_prefix + ident
+                choices = [c for c in songtable[ident].choices if c not in used_songs]
+                if not choices: choices.append(native_prefix + ident)
+                newsong = rng.choice(choices)
+                if (newsong in used_songs) and (not f_repeat):
+                    #print "bounced setting {} as {}".format(newsong, ident)
+                    keeptrying = True
+                    break
+                else:
+                    if not f_repeat: used_songs.append(newsong)
+                    songtable[ident].changeto = newsong if f_randomize else native_prefix + ident
                 
         if keeptrying:
             dprint("failed music generation during song selection")
@@ -895,8 +1591,34 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         
         #get data now, so we can keeptrying if there's not enough space
         for ident, s in songtable.items():
+            if s.changeto == '!!tierboss':
+                s.data, s.inst = process_tierboss(tierboss[ident])
+                s.is_pointer = False
+            # case: get song from MML
+            elif os.path.isfile(os.path.join("music", s.changeto + ".mml")):
+                try:
+                    with open(os.path.join("music", s.changeto + ".mml"), 'r') as mmlf:
+                        mml = mmlf.read()
+                except:
+                    print "couldn't open {}.mml".format(s.changeto)
+                    keeptrying = True
+                    break
+                akao = process_mml(s.id, mml, s.changeto + ".mml")
+                s.data = akao['_default_'][0]
+                s.inst = akao['_default_'][1]
+                s.is_pointer = False
+                if max(map(ord, s.inst)) > instcount:
+                    if 'nopatch' in akao:
+                        s.inst = akao['nopatch'][1]
+                        s.data = akao['nopatch'][0]
+                    elif 'nat' in akao:
+                        s.inst = akao['nat'][1]
+                        s.data = akao['nat'][0]
+                    else:
+                        print "WARNING: instrument out of range in {}".format(s.changeto + ".mml")
+                        
             # case: get song from source ROM
-            if not os.path.isfile(os.path.join("music", s.changeto + "_data.bin")):
+            elif not os.path.isfile(os.path.join("music", s.changeto + "_data.bin")):
                 target = s.changeto[len(native_prefix):]
                 if (s.changeto[:len(native_prefix)] == native_prefix and
                         target in songtable):
@@ -987,6 +1709,8 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
                     i += 1
                 if streak >= 64: freelocs.append((i-streak, i))
             songdatalocs = freelocs
+        else:
+            free_space(songdatalocs[0][0], songdatalocs[0][1])
         if f_moveinst:
             instsize = (len(songtable)+1) * 0x20
             for i, l in enumerate(songdatalocs):
@@ -999,30 +1723,44 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         space = [e - b for b, e in songdatalocs]
         songdata = [""] * len(space)
         songinst = data[isetlocs[0]:isetlocs[1]+1]    
+        if f_moveinst: free_space(isetlocs[0], isetlocs[1])
+        claim_space(songptraddrs[0], songptraddrs[0] + 3*(len(songtable)+1))
         #dprint("    free space for music: {}".format(space))
         for ident, s in songtable.items():
             #dprint("attempting to insert {} in slot {} ({})".format(s.changeto, s.id, ident))
-            for i, l in enumerate(songdatalocs):
-                if not s.is_pointer:
-                    if space[i] >= len(s.data):
-                        insertloc = l[0] + len(songdata[i])
-                        songdata[i] += s.data
-                        space[i] -= len(s.data)
-                        songinst = byte_insert(songinst, s.id * isetsize, s.inst, isetsize)
-                        songptrdata = int_insert(songptrdata, s.id * 3, insertloc + HIROM, 3)
-                        songlocations[s.id] = insertloc
-                        break
-                else:
-                    songptrdata = int_insert(songptrdata, s.id * 3, s.data, 3)
-                    songlocations[s.id] = s.data - HIROM
-                    break
+#            for i, l in enumerate(songdatalocs):
+#                if not s.is_pointer:
+#                    if space[i] >= len(s.data):
+#                        insertloc = l[0] + len(songdata[i])
+#                        songdata[i] += s.data
+#                        space[i] -= len(s.data)
+#                        songinst = byte_insert(songinst, s.id * isetsize, s.inst, isetsize)
+#                        songptrdata = int_insert(songptrdata, s.id * 3, insertloc + HIROM, 3)
+#                        songlocations[s.id] = insertloc
+#                        break
+#                    else:
+#                        songptrdata = int_insert(songptrdata, s.id * 3, s.data, 3)
+#                        songlocations[s.id] = s.data - HIROM
+#                        break
+            if not s.is_pointer:
+                try:
+                    data, start, end = put_somewhere(data, s.data, "  (song) [{:02x}] {}".format(s.id, s.changeto), True)
+                except AssertionError:
+                    data = data_in
+                    continue
+                songinst = byte_insert(songinst, s.id * isetsize, s.inst, isetsize)
+                songptrdata = int_insert(songptrdata, s.id * 3, start + HIROM, 3)
+                songlocations[s.id] = start
+            else:
+                songptrdata = int_insert(songptrdata, s.id * 3, s.data, 3)
+                songlocations[s.id] = s.data - HIROM
                     
     if attempts >= 1000:
         print "failed to produce valid music set"
         print "    try increasing available space or adjusting song insert list"
         print "    to use less space"
         print
-        return data
+        return data_in
     
     # build battle music related tables
     if f_battleprog:
@@ -1052,13 +1790,15 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
         
         
     # write to rom
-    if f_moveinst:
+    #if f_moveinst:
         #songptrptr = int(CONFIG.get('MusicPtr', 'songpointerpointer'), 16)
         #don't need to move song pointers because we are assuming it can just
         #extend into the instrument space we are now freeing. may need to
         #add contingency for if they are already separate later.
-        instlocptr = int(CONFIG.get('MusicPtr', 'instrumentpointer'), 16)
-        data = int_insert(data, instlocptr, new_instloc[0] + HIROM, 3)
+        
+        #instlocptr = int(CONFIG.get('MusicPtr', 'instrumentpointer'), 16)
+        #data = int_insert(data, instlocptr, new_instloc[0] + HIROM, 3)
+        
         
     if f_battleprog:
         data = byte_insert(data, pausetableloc, pausetable, 5)
@@ -1067,11 +1807,14 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
     if not f_moveinst: songptrdata = songptrdata[:songptraddrs[1] + 1]
     data = byte_insert(data, songptraddrs[0], songptrdata)
     if f_moveinst:
-        data = byte_insert(data, new_instloc[0], songinst, end=new_instloc[1])
+        #data = byte_insert(data, new_instloc[0], songinst, end=new_instloc[1])
+        data, s, e = put_somewhere(data, songinst, "INSTRUMENT TABLES FOR SONGS")
+        instlocptr = int(CONFIG.get('MusicPtr', 'instrumentpointer'), 16)
+        data = int_insert(data, instlocptr, s + HIROM, 3)
     else:
         data = byte_insert(data, isetlocs[0], songinst, end=isetlocs[1])
-    for i, l in enumerate(songdatalocs):
-        data = byte_insert(data, l[0], songdata[i], end=l[1])
+    #for i, l in enumerate(songdatalocs):
+    #    data = byte_insert(data, l[0], songdata[i], end=l[1])
     
     # make spoiler
     changed_songs = {}
@@ -1099,15 +1842,17 @@ def process_custom_music(data, f_randomize, f_battleprog, f_mchaos, f_altsonglis
     
 def process_formation_music(data, f_shufflefield):
     print "** Processing progressive battle music ..."
-    isetlocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'instruments').split(',')]
-    if len(isetlocs) != 2: isetlocs = to_default('instruments')
-    songdatalocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'songdata').split(',')]
-    starts = songdatalocs[::2]
-    ends = songdatalocs[1::2]
-    if len(ends) < len(starts): ends.append(0x3FFFFF)
-    songdatalocs = zip(starts, ends)
-    native_prefix = "ff6_"
-    isetsize = 0x20
+    
+    o_mpacks = 0xF4800
+    o_mzones = 0xF5400
+    
+    formlocs = [int(s.strip(),16) for s in CONFIG.get('EnemyPtr', 'forms_loc').split(',')]
+    if len(formlocs) != 2: formlocs = to_default('forms_loc')
+    formsize = int(CONFIG.get('EnemyPtr', 'forms_size'), 16)
+    auxlocs = [int(s.strip(),16) for s in CONFIG.get('EnemyPtr', 'forms_aux').split(',')]
+    if len(auxlocs) != 2: auxlocs = to_default('forms_aux')
+    auxsize = int(CONFIG.get('EnemyPtr', 'forms_aux_size'), 16)
+    auxdata = data[auxlocs[0]:auxlocs[1]+1]
     
     # build table of monster levels
     monsterlocs = [int(s.strip(),16) for s in CONFIG.get('EnemyPtr', 'monsters_loc').split(',')]
@@ -1121,11 +1866,8 @@ def process_formation_music(data, f_shufflefield):
         monsterlevels.append(ord(data[levelloc]))
         
     # build table of average levels within formations
-    formlocs = [int(s.strip(),16) for s in CONFIG.get('EnemyPtr', 'forms_loc').split(',')]
-    if len(formlocs) != 2: formlocs = to_default('forms_loc')
-    formsize = int(CONFIG.get('EnemyPtr', 'forms_size'), 16)
-    
-    formcount = (formlocs[1] + 1 - formlocs[0]) / formsize
+    #formcount = (formlocs[1] + 1 - formlocs[0]) / formsize
+    formcount = int(CONFIG.get('EnemyPtr', 'forms_count'), 16)
     formlevels = []
     forms = [] #debug
     for i in xrange(0, formcount):
@@ -1141,41 +1883,143 @@ def process_formation_music(data, f_shufflefield):
         else:
             formlevels.append(0)
         forms.append(map(ord, form)) #debug
-                
+
+    f_bylevel = True
+    if 'battlebylevel' not in FLAGS:
+        f_bylevel = False
+        ##### new progression, by location
+        pack_map = {}
+        ruin_map = set()
+        try:
+            with open(os.path.join('tables', 'ruinmaps.txt'), 'r') as f:
+                ruin = f.read().split()
+        except IOError:
+            ruin = []
+        for n in ruin:
+            try:
+                ruin_map.add(int(n, 16))
+            except ValueError:
+                pass        
+        
+        #random packs
+        loc = o_mpacks
+        for i in xrange(0,256):
+            pack = []
+            for j in xrange(0,4):
+                pack.append(bytes_to_int(data[loc:loc+2]))
+                loc += 2
+            pack_map[i] = pack
+        #event packs
+        for i in xrange(256,512):
+            pack = []
+            for j in xrange(0,2):
+                pack.append(bytes_to_int(data[loc:loc+2]))
+                loc += 2
+            pack_map[i] = pack
+        
+        form_map = {}
+        form_map_d = {}
+        #set wor-inside (6)
+        loc = o_mzones + 512
+        for i in xrange(0,512):
+            if i in ruin_map:
+                pack = pack_map[bytes_to_int(data[loc])]
+                for f in pack:
+                    form_map[f] = 6
+                    if f in form_map_d:
+                        form_map_d[f].add(6)
+                    else:
+                        form_map_d[f] = {6}
+            loc += 1
+        #set wor-outside (4)
+        loc = o_mzones + 256
+        for i in xrange(0,256):
+            pack = pack_map[bytes_to_int(data[loc])]
+            for f in pack:
+                form_map[f] = 4
+                if f in form_map_d:
+                    form_map_d[f].add(4)
+                else:
+                    form_map_d[f] = {4}
+            loc += 1
+        #set event (7)
+        for i in xrange(256,512):
+            pack = pack_map[i]
+            for f in pack:
+                form_map[f] = 7
+                if f in form_map_d:
+                    form_map_d[f].add(7)
+                else:
+                    form_map_d[f] = {7}
+        #set wob-inside (3)
+        loc = o_mzones + 512
+        for i in xrange(0,512):
+            if i not in ruin_map:
+                pack = pack_map[bytes_to_int(data[loc])]
+                for f in pack:
+                    form_map[f] = 3
+                    if f in form_map_d:
+                        form_map_d[f].add(3)
+                    else:
+                        form_map_d[f] = {3}
+            loc += 1
+        #set wob-outside (0)
+        loc = o_mzones
+        for i in xrange(0,256):
+            if i % 4 == 3: continue #no blasted land in WoB
+            pack = pack_map[bytes_to_int(data[loc])]
+            for f in pack:
+                form_map[f] = 0
+                if f in form_map_d:
+                    form_map_d[f].add(0)
+                else:
+                    form_map_d[f] = {0}
+            loc += 1   
+            
     # iterate aux form data and:
     #   if music is 1, chance to change it to 2
     #   if it's 0/3/4/6/7, set according to level percentile
-    auxlocs = [int(s.strip(),16) for s in CONFIG.get('EnemyPtr', 'forms_aux').split(',')]
-    if len(monsterlocs) != 2: monsterlocs = to_default('forms_aux')
-    auxsize = int(CONFIG.get('EnemyPtr', 'forms_aux_size'), 16)
-    auxdata = data[auxlocs[0]:auxlocs[1]+1]
     formsongs = [] #debug
     for i in xrange(0, formcount):
         loc = i * auxsize + 3
         byte = ord(auxdata[loc])
         keepfield = byte >> 7
-        song = (byte >> 4) & 0b0111
+        song = (byte >> 3) & 0b111
         maxlevel = max(formlevels)
+        if i in [512,513,514]:
+            byte |= 0b10000000
+            fanbyte = ord(auxdata[loc-2])
+            fanbyte |= 0b10
+            auxdata = byte_insert(auxdata, loc-2, chr(fanbyte))
+            formsongs.append("x")
+            auxdata = byte_insert(auxdata, loc, chr(byte))
+            continue
         if song == 1 and not keepfield:
             if rng.randint(0, 20 + maxlevel) < (20 + formlevels[i]):
                 song = 2
-                byte = (byte & 0b10001111) | (song << 4)
-        elif song != 5:
-            tier = maxlevel / 5
-            if formlevels[i] >= tier * 4: song = 7
-            elif formlevels[i] >= tier * 3: song = 6
-            elif formlevels[i] >= tier * 2: song = 4
-            elif formlevels[i] >= tier * 1: song = 3
-            else: song = 0
-            byte = (byte & 0b10001111) | (song << 4)
-            if f_shufflefield:
+                byte = (byte & 0b11000111) | (song << 3)
+        elif keepfield or (song not in [2, 5]):
+            if f_bylevel:
+                tier = maxlevel / 5
+                if formlevels[i] >= tier * 4: song = 7
+                elif formlevels[i] >= tier * 3: song = 6
+                elif formlevels[i] >= tier * 2: song = 4
+                elif formlevels[i] >= tier * 1: song = 3
+                else: song = 0
+            else:
+                if i in form_map:
+                    song = form_map[i]
+                else:
+                    song = 0
+            byte = (byte & 0b11000111) | (song << 3)
+            if f_shufflefield and (f_bylevel or song != 7):
                 fieldchance = int(CONFIG.get('Music', 'field_music_chance').strip())
                 if fieldchance > 100 or fieldchance < 0: fieldchance = to_default('field_music_chance')
-                if rng.randint(1,100) > fieldchance:
+                if  rng.randint(1,100) > fieldchance:
                     byte &= 0b01111111
                     fanfare = True
                 else:
-                    byte |= 1 << 7
+                    byte |= (1 << 7)
                     fanfare = False
                 fanbyte = ord(auxdata[loc-2])
                 if fanfare:
@@ -1192,7 +2036,8 @@ def process_formation_music(data, f_shufflefield):
         for i in xrange(0, formcount):
             despoil()
             despoil("FORMATION {} assigned song {}".format(i, formsongs[i]))
-            despoil("contains {} :: avg {}".format(forms[i], formlevels[i]))
+            despoil("contains {} :: avg {}".format(forms[i], formlevels[i]))  
+        
     return byte_insert(data, auxlocs[0], auxdata, end=auxlocs[1])
 
 def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
@@ -1321,7 +2166,6 @@ def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
     else:
         changemap = [False] * 19
         for p in xrange(0,21):
-            print "P {}".format(p)
             if p in [18, 19]: continue
             pp = 18 if p == 20 else p
             pid = ord(data[o_portptrs + p])
@@ -1330,31 +2174,31 @@ def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
             thisport = data[loc:loc+0x320]
             
             thishash = hashlib.md5(thisport).hexdigest()
-            print "got portrait {} -- md5 {}".format(pid, thishash)
+            #print "got portrait {} -- md5 {}".format(pid, thishash)
             if thishash in porthashes:
                 spritehashes = porthashtbl[porthashes.index(thishash)][1:]
-                print "hash match (known ph). {} sprite hashes identified: {}".format(len(spritehashes), spritehashes)
+                #print "hash match (known ph). {} sprite hashes identified: {}".format(len(spritehashes), spritehashes)
                 sloc = o_spritesheet + (min(sid,16) * o_spritesizea) + (max(0,sid-16) * o_spritesizeb)
                 thissprite = data[sloc:sloc+o_spritesizeb]
                 shash = hashlib.md5(thissprite).hexdigest()
-                print "got sprite {} -- len {} md5 {}".format(sid, len(thissprite), shash)
+                #print "got sprite {} -- len {} md5 {}".format(sid, len(thissprite), shash)
                 if shash not in spritehashes:
-                    print "sprite not approved for placeholder. setting to change"
+                    #print "sprite not approved for placeholder. setting to change"
                     changemap[pp] = True
                 else:
                     thisidx = spritehashes.index(shash)
                     if shash in spriterecord:
                         if spriterecord[shash][1] <= thisidx:
-                            print "{} found in record, supersedes idx{}".format(spriterecord[shash][1],thisidx)
+                            #print "{} found in record, supersedes idx{}".format(spriterecord[shash][1],thisidx)
                             changemap[pp] = True
                         else:
                             changemap[spriterecord[shash][0]] = False
                             spriterecord[shash] = (pid, thisidx)
-                            print "recorded {} for {}".format(spriterecord[shash], shash)
+                            #print "recorded {} for {}".format(spriterecord[shash], shash)
             elif thisport in orig_portraits:
-                print "this duplicates pid {}, setting to change".format(orig_portraits.index(thisport))
+                #print "this duplicates pid {}, setting to change".format(orig_portraits.index(thisport))
                 changemap[pp] = True
-                print changemap
+                #print changemap
             orig_portraits.append(thisport)
             
             loc = o_portpals + pid * 32
@@ -1372,19 +2216,21 @@ def process_sprite_portraits(data_in, f_merchant=False, f_changeall=False):
             data = byte_insert(data, loc, orig_palettes[p], 32)
         
     # fix BC v64 messing up portrait pointers
-    loc = o_portptrs
-    pt = (range(0, 0x10) + ([0xE] if f_merchant else [0x10]) + [0x11, 0] +
-            ([0x10] if f_merchant else [1]) + [0x12, 0, 0, 0, 0, 0, 6])
-    porttable = "".join(map(chr, pt))
-    for i in xrange(0,0x1B):
-        porttable = int_insert(porttable, len(porttable), 0x320*pt[i], 2)
-    data = byte_insert(data, loc, porttable, 0x4F)
+    data = unfuck_portraits(data, f_merchant)
+    #loc = o_portptrs
+    #pt = (range(0, 0x10) + ([0xE] if f_merchant else [0x10]) + [0x11, 0] +
+    #        ([0x10] if f_merchant else [1]) + [0x12, 0, 0, 0, 0, 0, 6])
+    #porttable = "".join(map(chr, pt))
+    #for i in xrange(0,0x1B):
+    #    porttable = int_insert(porttable, len(porttable), 0x320*pt[i], 2)
+    #data = byte_insert(data, loc, porttable, 0x4F)
     
     assert len(data_in) == len(data)
     return data
 
 # tool to help exploratory design on a far future mode
 # not for public but if you find this and want to try it, knock yrself out
+FXDB = set()
 def mangle_magic(data_in):
     data = data_in
     
@@ -1395,36 +2241,185 @@ def mangle_magic(data_in):
     animtable = ConfigParser.ConfigParser()
     animtable.read('sdev')
     
-    layertbl = {}
-    for lyr in ['1', '2', '3', '4']:
-        print lyr
-        for i, d in enumerate(animtable.get('sdev', lyr).split()):
-            print "{}: {} {}".format(i, type(d), d)
-        for id in animtable.get('sdev', lyr).split():
-            iid = int(id, 16)
-            if iid not in layertbl: layertbl[iid] = []
-            layertbl[iid].append(int(lyr))
-    
-    sanims, snames, spells = "", "", ""
-    for id in sorted(layertbl.keys()):
-        sid = id - 0x79
-        if sid < 0: continue
-        sanim = sanim_base
-        namel = ""
-        for lyr in [(1,0,'S'), (2,2,'1'), (3,4,'3'), (4,11,'E')]:
-            f_high = False if lyr[0] == 1 else False
-            if lyr[0] in layertbl[id]:
-                sanim = int_insert(sanim, lyr[1], id + f_high, 2)
-                namel += lyr[2]
-            else:
-                namel += "-"
+    def read_fxdb():
+        global FXDB
+        
+        def decomment(file):
+            for row in file:
+                rw = row.split('#')[0].strip()
+                print "{} {}".format(len(rw), rw)
+                if len([c for c in rw if c == ',']) >= 10:
+                    yield rw
+                else:
+                    print "warning: too few parameters in line: {}".format(rw)
                 
-        sname = "{} {}  ".format(hex(id)[2:].rjust(3,' '), namel)
-        if sid <= 64: sname = sname[1:3] + sname[4:9]
-        elif sid <= (64+35): sname = sname[:8]
-        sanims += sanim
-        snames += sname.translate(TO_BATTLETEXT)
-        spells += spell_base
+        with open(os.path.join("tables", "SpellEffects.txt"), "r") as f:
+            f = csv.reader(decomment(f))
+            
+            class SpellFx:
+                def __init__(self, line):
+                    self.id, self.name, self.role, self.layer, self.script, self.targets, self.palettes, self.colors, self.sounds, self.tags, self.reqs = line
+                    self.id = int(self.id, 16)
+                    self.script = [s.strip() for s in self.script if len(s) and s != "*"]
+                    self.sounds = [s.strip() for s in self.sounds if len(s) and s != "*"]
+                    self.tags = [s.strip() for s in self.tags.split(' ') if len(s.strip())]
+                    #self.reqs = [s.strip() for s in self.reqs.split(' ')]
+                def __repr__(self): return repr(vars(self))
+            for l in f:
+                FXDB.add(SpellFx(l))
+    
+    def parse_constraints(constraints, mustbe=None, mustnot=None):
+        if mustbe is None: mustbe = set()
+        if mustnot is None: mustnot = set()
+        if constraints.strip():
+            constraints = [s.strip() for s in constraints.split(' ') if len(s.strip())]
+            mustbe.update((s[1:] for s in constraints if s[0] == '+'))
+            mustnot.update((s[1:] for s in constraints if s[0] == '-'))
+        if '' in mustbe: mustbe.remove('')
+        if '' in mustnot: mustnot.remove('')
+        return mustbe, mustnot
+        
+    def generate_anim(constraints):
+        global FXDB
+        if not FXDB: read_fxdb()
+        
+        class SpellAnimSub:
+            def __init__(self, id, pal):
+                self.id, self.pal = id, pal
+            def __repr__(self): return "<ID {}, palette {}>".format(hex(self.id), hex(self.pal))
+        class SpellAnim:
+            def __init__(self, spr, bg1, bg3, ext, sound, script, spd, name):
+                self.spr, self.bg1, self.bg3, self.ext, self.sound, self.script, self.spd, self.name = spr, bg1, bg3, ext, sound, script, spd, name
+            def __repr__(self): return "-={}=-\n  sound {}, script {}, speed {}\n  Sprite {}\n  BG1    {}\n  BG3    {}\n  Extra  {}".format(self.name, self.sound, self.script, self.spd, self.spr, self.bg1, self.bg3, self.ext)
+            def encode(self):
+                bytestring = chr(self.spr.id & 0xFF) + chr(self.spr.id >> 8)
+                bytestring += chr(self.bg1.id & 0xFF) + chr(self.bg1.id >> 8)
+                bytestring += chr(self.bg3.id & 0xFF) + chr(self.bg3.id >> 8)
+                bytestring += chr(self.spr.pal) + chr(self.bg1.pal) + chr(self.bg3.pal)
+                bytestring += chr(self.sound) + chr(self.script)
+                bytestring += chr(self.ext.id & 0xFF) + chr(self.ext.id >> 8)
+                bytestring += chr(self.spd)
+                return bytestring
+                
+        blanksub = SpellAnimSub(0xFFFF, 0)
+        blankanim = SpellAnim(blanksub, blanksub, blanksub, blanksub, 0, 0x1B, 16, "       ")
+        found = False
+        while not found:
+            aout = SpellAnim(blanksub, blanksub, blanksub, blanksub, 0, 0x1B, 16, "       ")
+            failed = False
+            usedlayers = ""
+            mustbe, mustnot = parse_constraints(constraints)
+            isalready = set()
+            count = rng.choice([1] + [2]*12 + [3]*66 + [4])
+            anims = []
+            role = "core"
+            #print "creating animation with {} elements".format(count)
+            
+            while len(anims) < count:
+                #print " filling role {}".format(role)
+                #print " our spell must include tags {}".format(mustbe)
+                if count - len(anims) == 1:
+                    thismustbe = mustbe
+                else:
+                    thismustbe = set([c for c in mustbe if rng.randint(0,1) and c not in isalready])
+                #print " this element must be {}".format(thismustbe)
+                opts = [fx for fx in FXDB if role in fx.role]
+                #print " found {} options matching role".format(len(opts))
+                for l in usedlayers.strip(): opts = [fx for fx in opts if l not in fx.layer]
+                #print " found {} options in unused layers".format(len(opts))
+                for c in thismustbe:
+                    #print "looking for tag {} among options {}".format(c, [fx.tags for fx in opts])
+                    opts = [fx for fx in opts if c in fx.tags]
+                #print " found {} options fitting mustbe constraints {}".format(len(opts), thismustbe)
+                for c in mustnot:
+                    opts = [fx for fx in opts if c not in fx.tags]
+                #print " found {} options fitting mustnot constraints {}".format(len(opts), mustnot)
+                newopts = []
+                for o in opts:
+                    accept = True
+                    for c in parse_constraints(o.reqs)[1]:
+                        if c in isalready:
+                            accept = False
+                    if accept: newopts.append(o)
+                opts = newopts
+                #print " found {} options without conflicting mustnot constraints (already {})".format(len(opts), isalready)
+                if not opts:
+                    failed = True
+                    #print " no options, restarting"
+                    break
+                    
+                anims.append(rng.choice(opts))
+                #print " chose {}".format(anims[-1])
+                if 's' in anims[-1].layer:
+                    aout.spr = SpellAnimSub(anims[-1].id, 0x9D)
+                if '1' in anims[-1].layer:
+                    aout.bg1 = SpellAnimSub(anims[-1].id, 0x9D)
+                if '3' in anims[-1].layer:
+                    aout.bg3 = SpellAnimSub(anims[-1].id, 0x9D)
+                if 'e' in anims[-1].layer:
+                    aout.ext = SpellAnimSub(anims[-1].id, 0x9D)
+                usedlayers += anims[-1].layer
+                isalready.update(anims[-1].tags)
+                #print " layers used: {}\n tags applied: {}".format(usedlayers, isalready)
+                if role == "core":
+                    aout.name = byte_insert(aout.name, 0, anims[-1].name.strip(), end=3)
+                    role = "aux"
+                else:
+                    aout.name = byte_insert(aout.name, 4, anims[-1].name.strip(), end=6)
+                #print "adding constraints {} to existing +({}) -({})".format(anims[-1].reqs, mustbe, mustnot)
+                mustbe, mustnot = parse_constraints(anims[-1].reqs, mustbe, mustnot)
+                #print "new constraints are +({}) -({})".format(mustbe, mustnot)
+            if failed: continue
+            for c in mustbe:
+                if c not in isalready:
+                    #print " failed to meet constraints, restarting"
+                    continue
+            found = True
+        return aout
+    
+    f_random = True
+    if f_random:
+        # generate random spellsets for testing the algorithm
+        sanims, snames, spells = "", "", ""        
+        for i in xrange(0,20):
+            a = generate_anim("")
+            print repr(a)
+            spells += spell_base
+            snames += a.name.translate(TO_BATTLETEXT)
+            sanims += a.encode()
+            
+    else:
+        # generate predictable spellsets for testing effects
+        layertbl = {}
+        for lyr in ['1', '2', '3', '4']:
+            print lyr
+            for i, d in enumerate(animtable.get('sdev', lyr).split()):
+                print "{}: {} {}".format(i, type(d), d)
+            for id in animtable.get('sdev', lyr).split():
+                iid = int(id, 16)
+                if iid not in layertbl: layertbl[iid] = []
+                layertbl[iid].append(int(lyr))
+        
+        sanims, snames, spells = "", "", ""
+        for id in sorted(layertbl.keys()):
+            sid = id - 0x79
+            if sid < 0: continue
+            sanim = sanim_base
+            namel = ""
+            for lyr in [(1,0,'S'), (2,2,'1'), (3,4,'3'), (4,11,'E')]:
+                f_high = False if lyr[0] == 1 else False
+                if lyr[0] in layertbl[id]:
+                    sanim = int_insert(sanim, lyr[1], id + f_high, 2)
+                    namel += lyr[2]
+                else:
+                    namel += "-"
+                    
+            sname = "{} {}  ".format(hex(id)[2:].rjust(3,' '), namel)
+            if sid <= 64: sname = sname[1:3] + sname[4:9]
+            elif sid <= (64+35): sname = sname[:8]
+            sanims += sanim
+            snames += sname.translate(TO_BATTLETEXT)
+            spells += spell_base
     
     data = byte_insert(data, 0x107FB2, sanims, end=0x1097FF)
     data = byte_insert(data, 0x26F567, snames, end=0x26FE8E)
@@ -1436,6 +2431,10 @@ def dothething():
     lastcfg = ConfigParser.ConfigParser(DEFAULT_DEFAULTS)
     lastcfg.read('lastused.cfg')
     
+    def reseed(seed):
+        rng.seed(seed+1)
+        return seed+1
+        
     print "Nascent Order supplemental randomizer for Final Fantasy VI by emberling"
     print "version {}".format(VERSION)
     print
@@ -1494,6 +2493,7 @@ def dothething():
     print
     rng.seed(seed)
     random = rng
+    vseed = seed
     
     # detect known romhacks
     hackconfig = ConfigParser.ConfigParser()
@@ -1535,8 +2535,9 @@ def dothething():
     print
     print "Options: (lowercase)"
     print "  b - create battle music progression"
-    # c - randomize character names, sprites, and portraits
+    print "  c - randomize character names, sprites, and portraits"
     # g - script edits reflecting characters' randomized identities
+    print "  i - add extended instruments"
     print "  n - convert oldcharname to class, and other tiny misc NaO flavored fixes"
     print "  m - music randomizer"
     print "  p - redo character palettes"
@@ -1547,7 +2548,7 @@ def dothething():
     print "keywords (all caps):"
     print "  MUSICCHAOS - songs that change choose from the entire pool of available songs"
     print "  ALTSONGLIST - uses songs_alt.txt instead of songs.txt for music config"
-    print "  NOFIELDSHUFFLE - 'b' no longer changes which battles continue field music"
+    print "  ONEWINGEDLEAFER - battle music progression based on level, not area (inconsistent)"
     print "  MESSMEUP - 'p' no longer applies updates to known incompatible sprites"
     print "  DISNEY - (p) advanced state-of-the-art cel shader mode"
     print "  GLOWSTICKS - (p) trance palettes for everyone"
@@ -1590,28 +2591,52 @@ def dothething():
     if 'TELLMEWHY' in modes:
         global f_tellmewhy
         f_tellmewhy = True
+    
+    if 'ONEWINGEDLEAFER' in modes:
+        FLAGS.add("battlebylevel")
+    if 'PIXELPARTY' in modes:
+        FLAGS.add('pixelparty')
+    if 'n' in modes:
+        FLAGS.add('miscfixes')
+    if 'c' in modes:
+        FLAGS.add('spriteimport')
+    if 'x' in modes:
+        FLAGS.add('portraits')
         
+    if 'i' in modes:
+        data = insert_instruments(data)
+        
+    vseed = reseed(vseed)
     if 'm' in modes or 'b' in modes:
         data = process_custom_music(data, 'm' in modes, 'b' in modes, 'MUSICCHAOS' in modes, 'ALTSONGLIST' in modes)
         if 'b' in modes:
             data = process_formation_music(data, 'NOFIELDSHUFFLE' not in modes)
     
+    vseed = reseed(vseed)
+    if 'c' in modes:
+        data = process_sprite_imports(data)
+        
+    vseed = reseed(vseed)
     if 'p' in modes:
         #data = process_actor_events(data)
         data = process_char_palettes(data, 'DISNEY' in modes, 'GLOWSTICKS' in modes)
         if 'MESSMEUP' not in modes:
             data = process_sprite_fixes(data)
             
+    vseed = reseed(vseed)
     if 'x' in modes:
         data = process_sprite_portraits(data, 'GENERALSTORE' in modes, 'PIXELPARTY' in modes)
     
+    vseed = reseed(vseed)
     if 'p' in modes:
         data = process_actor_events(data)
         data = process_npcdb(data)
         
+    vseed = reseed(vseed)
     if 'n' in modes:
         data = process_misc_fixes(data)
         
+    vseed = reseed(vseed)
     if 'MANGLEMAGIC' in modes:
         data = mangle_magic(data)
         
