@@ -182,7 +182,11 @@ def mml_to_akao_main(mml, ignore='', fileid='mml'):
             if post:
                 pre = pre.replace("'", "").strip()
                 for c in ignore:
-                    post = re.sub(c+".*?"+c, "", post)
+                    try:
+                        post = re.sub(c+".*?"+c, "", post)
+                    except Exception:
+                        c = "\\" + c
+                        post = re.sub(c+".*?"+c, "", post)
                     post = "".join(post.split())
                 macros[pre] = post.lower()
     

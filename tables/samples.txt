@@ -6,12 +6,12 @@
 43: ts43_synstr,    C804, 1E00, F 7 7  0
 44: s201_synplk,    4206, FC60, F 7 7  F
 45: ct2c_synstr,    1B00, E9F0, F 7 7  0
-46: ts46_strings,   1B00, 0100, F 7 7  0
+46: tr37_strings,   1B00, E099, D 2 5  0
 47: ct35_bell,      0000, 2300, E 7 7 14
 48: ts48_sitar,     0216, D600, F 7 7  E
 49: ts49_strings,   A506, 1800, F 7 7  0
 4A: ts4a_sbass,     3108, D380, F 7 7  E
-4B: ll0f_shaku,     F402, 0064, D 7 7  0
+4B: ct23_synth,     1B00, 5400, F 7 7  0
 4C: ts4c_gong,      320A, E100, F 7 7 10
 4D: ts4d_fbass,     DF05, D3A0, F 7 7  E
 4E: ts4e_violin,    E20B, 1BF0, F 7 7  0
