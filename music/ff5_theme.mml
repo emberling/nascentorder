@@ -5,6 +5,9 @@
 # via ff5~ff6mcs2
 # Converted from binary by mfvitools
 
+#VARIANT ~ enh
+#VARIANT / nat
+
 #WAVE 0x20 --  0x0A         #oboe
 #WAVE 0x21 --  0x0E         #trumpet
 #WAVE 0x22 --  0x0D         #strings
