@@ -7,3 +7,4 @@
 
 [HackDetection]
 tsushiy_inst: 31000B, 2A, AA, E2, C0, FB, E4
+std_exp_inst: 31002A, AF, 80, E1, 58, FD, A0

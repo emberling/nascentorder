@@ -5,7 +5,6 @@
 
 #VARIANT ~ enh
 #VARIANT / nat
-#SFXV ` *
 
 #WAVE 0x20 ~0x73~ /0x1A/
 #WAVE 0x21 ~0x7A~ /0x08/
@@ -16,12 +15,12 @@
 
 #def global= t115%v50%x224%b0,70
 
-#def bass= |5 o5 v
-#def baritone= |0 ~o3~/o5%y0/ %s5 v48,18,237
-#def tenor= |1 ~o5~/o5/ v48,18,237
-#def alto= |2 ~o5~/o6/ ~v~/v48,18,237/
-#def soprano= |3 ~o6~/o6/ v48,18,237
-#def tim= |4 ~o3~/o3/ v
+#def bass= |5 o5 m
+#def baritone= |0 ~o3~/o5%y0/ %s5 m48,18,207
+#def tenor= |1 ~o5~/o5/ m48,18,239
+#def alto= |2 ~o5~/o6/ ~m~/m48,18,239/
+#def soprano= |3 ~o6~/o6/ m48,18,207
+#def tim= |4 ~o3~/o3/ m
 
 #def bv80= ~v80~/v40/
 #def bv96= ~v96~/v48/
@@ -118,7 +117,7 @@ r2 'r16'e-a-'r1'b-2 'r8'e-a- <e->b-a-e-<d-e-> 'r1'b-2. r2.
 'av112' 'r4'e.'r16'e16e'r8'ec+e'av96''r0'c+1. r1.
 ;
 
-*{3}*`{5}`
+{3}
 r1. $
 'tenor' %e1 'tv64' p89 l8
 r1. 'tvs72''r16'ddd'r8'dcg'r1'd1. r2.
@@ -155,7 +154,7 @@ r 'r16'e-a-'r8'<e->'r16'b-a- 'r8'e-'r16'a-<e->j2'r1'b-4.]'r4'b-4.
 'soprano''r8''sv112' f+'r16'c+16c+16'r8'f+a+g+e'r1'f+1 r4r1
 ;
 
-*{4}*`{8}`
+{4}
 r1. $
 'baritone' %e1 'bv80' p113 l2
 %a3 a. %a4 <d. %a3 a.f.> 'bv96' a. %a4 <d. %a3 a.>g.
@@ -178,7 +177,7 @@ r1. r <'r16'f+b<f+c+>b f+b<f+'r1''tvf40'c+1^> r2.
 'tv127''r16'f+c+16c+16f+a+g+e 'r4'f+2.
 ;
 
-*{5}*`{3}`
+{5}
 'tim' %e1 p64 l8
 'dv127'd4.'dv112'ddd 'dv127'd4.'dv112'ddd+ $
 'tim'p64[3'dv127'd4.d4.d4.'dv112'ddd+]'dv127'd4.d4.
@@ -241,7 +240,7 @@ r1. $ [7r2.]
 [17r2.]
 ;
 
-*{8}*`{4}`
-r;
+{8}
+;
 
 

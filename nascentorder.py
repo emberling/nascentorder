@@ -1,19 +1,21 @@
-VERSION = "0.2.0"
+VERSION = "0.2.1pre"
 DEBUG = False
-import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib, re, csv
+import sys, traceback, ConfigParser, random, time, os.path, operator, hashlib, re, csv, math
 from copy import copy
 from string import maketrans
 
 from mml2mfvi import mml_to_akao
 
+_isbeyondchaos = False
 HIROM = 0xC00000
 defaultmode = 'bcinmpx'
 CONFIG_DEFAULTS = {
         'modes': defaultmode,
-        'free_rom_space': '310000-3FFFFF',
+        'free_rom_space': '310600-3FFFFF',
         'skip_hack_detection': 'False',
         'allow_music_repeats': 'False',
         'field_music_chance': '0',
+        'brr_metadata_target_offset': 'False',
         'preserve_song_data': 'False',
         'battle_music_lookup': 'battle1, boss2, boss3, battle2, battle3, 3B, battle4, boss1',
         'battle_music_ids': '24, new, new, new',
@@ -66,10 +68,17 @@ spoiler = {}
 f_tellmewhy = False
 npcdb = {}
 freespace = None
+MUSIC_PATH = 'music'
 
+# function needed to share code between BC & NaO. BC needs code here to allow pyinstaller to work in single exe mode. NaO does not use single exe mode, so no need to do anything here
+def safepath(vpath):
+    return vpath
+    
+def isfile(fn):
+    return os.path.isfile(fn)
+    
 def dprint(msg):
     if DEBUG: print msg
-
     
 def despoil(txt=""):
     global spoiler
@@ -1093,33 +1102,230 @@ def process_char_palettes(data_in, f_cel, f_rave):
         data = byte_insert(data, o_bpaldata + i*32, bin, 32)
     
     return data
-        
-def insert_instruments(data_in):
+
+
+def process_monsters(data_in):
     data = data_in
-    print "** Inserting extended instrument samples ..."
+    print "** Unleashing monsters ..."
+    
+    o_monsters = 0x0F0000
+    o_formations = 0x0F6200
+    o_mgfxdata = 0x127000
+    o_tileptr_s = 0x12A824
+    o_tileptr_l = 0x12AC24
+    o_tilebase = 0x120000
+    num_monsters = 384
+    num_formations = 576
+    num_molds = 13
+    
+    formtable = ConfigParser.ConfigParser()
+    formtable.read(os.path.join("tables", "formations.txt"))
+    
+    ## step 1: parse monster data in ROM
+    class Monster:
+        def __init__(self, id):
+            offset = o_monsters + id * 0x20
+            m = data[offset:offset+0x20]
+            self.bin = m
+            self.id = id
+            self.magic = True if ord(m[0x12]) & 0x01 else False
+            self.humanoid = True if ord(m[0x12]) & 0x10 else False
+            self.undead = True if ord(m[0x12]) & 0x80 else False
+            self.rooted = True if ord(m[0x13]) & 0x04 else False
+            self.flying = True if ord(m[0x1D]) & 0x01 else False
+            
+            self.weak, self.absorb = {}, {}
+            elements = {0:"fire", 1:"ice", 2:"lightning", 3:"dark", 4:"wind", 5:"holy", 6:"earth", 7:"water"}
+            for e in xrange(0,8):
+                self.absorb[elements[e]] = True if ord(m[0x17]) & 2**e else False
+                self.weak[elements[e]] = True if ord(m[0x19]) & 2**e else False
+            
+            self.width, self.height, self.threebit = 128, 128, False
+            self.used = False
+        def __repr__(self):
+            st = "Monster<{:X}> -- {}x{}x{}  ".format(self.id, self.width, self.height, 8 if self.threebit else 16)
+            if self.magic: st += "magic, "
+            if self.humanoid: st += "humanoid, "
+            if self.undead: st += "undead, "
+            if self.rooted: st += "rooted, "
+            if self.flying: st += "flying, "
+            weak, absorb = "", ""
+            for e in xrange(0,8):
+                if self.absorb[elements[e]]: absorb += "{} & ".format(elements[e])
+                if self.weak[elements[e]]: weak += "{} & ".format(elements[e])
+            if weak: weak = "weak to {}, ".format(weak[0:-3])
+            if absorb: absorb = "absorbs {}, ".format(absorb[0:-3])
+            st += absorb + weak
+            return st[0:-2]
+            
+    monsterdb, molds = {}, {}
+    for m in xrange(0,num_monsters):
+        monsterdb[m] = Monster(m)
+    for mold_id in xrange(0,num_molds):
+        m = [None] * 6
+        line = [s.strip() for s in formtable.get("Molds", str(mold_id)).split(',')]
+        for n, tok in enumerate(line):
+            tok = tok.split('x')
+            if len(tok) == 2:
+                try:
+                    w, h = int(tok[0]), int(tok[1])
+                    m[n] = (w, h)
+                except ValueError:
+                    print "WARNING: could not parse {} in formations.txt/molds".format(tok)
+            elif tok != "null":
+                print "WARNING: could not parse {} in formations.txt/molds".format(tok)
+        molds[mold_id] = m
+    for f in xrange(0,num_formations):
+        fd = o_formations + 15 * f
+        present = ord(fd[1])
+        mold_id = ord(fd[0]) >> 4
+        msb = ord(fd[0x0E])
+        for idx in xrange(0,6):
+            mon_id = ord(fd[idx + 2]) + (256 if (msb & 2**idx) else 0)
+            if present & 2**idx:
+                if molds[mold_id][idx]:
+                    w, h = molds[mold_id][idx]
+                    monsterdb[mon_id].used = True
+                    monsterdb[mon_id].width = min(monsterdb[mon_id].width, w)
+                    monsterdb[mon_id].height = min(monsterdb[mon_id].height, h)
+        
+    ## step 2: load monster graphic candidates
+    class MonsterGraphic:
+        def __init__(self, metadata):
+            self.name = metadata.split(":")[0].strip()
+            parms = [s.strip() for s in metadata.split(":")[1].split(';')]
+            params = {}
+            for p in parms:
+                sp = p.split(' ', 1)
+                if len(sp) > 1: params[sp[0]] = sp[1]
+            
+            if "TAGS" in params:
+                self.tags = params["TAGS"].split(' ')
+            else: self.tags = []
+            
+            self.width = None
+            if "SIZE" in params:
+                sz = params["SIZE"].split('x')
+                if len(sz) >= 3:
+                    self.width, self.height, self.depth = sz[0], sz[1], sz[2]
+                    self.tilew, self.tileh, self.bpp = int(ceil(sz[0]/8.0)), int(ceil(sz[1]/8.0)), 3 if sz[2] == 8 else 4
+            if not self.width:
+                self.width, self.height, self.depth = 128, 128, 16
+                self.tilew, self.tileh, self.bpp = 4, 4, 4
+            dim_breakpoints = [32, 64, 96]
+            wclass, hclass = None, None
+            for bp in dim_breakpoints:
+                if not wclass and self.width < bp: wclass = bp
+                if not hclass and self.height < bp: hclass = bp
+            if not wclass: wclass = 128
+            if not hclass: hclass = 128
+            self.size_class = "{}x{}".format(wclass, hclass)
+            if self.size_class == "32x96": self.size_class = "64x96"
+            if self.size_class == "32x128": self.size_class = "64x128"
+            if self.size_class == "64x32": self.size_class = "64x64"
+            if self.size_class == "96x32": self.size_class = "96x64"
+            if self.size_class in ["96x128","128x32","128x64","128x96"]: self.size_class = "128x128"
+            
+            if "LAYOUT" in params:
+                layout = params["LAYOUT"].split(' ')
+                if len(layout) != self.tileh:
+                    print "WARNING: in {}: layout height {}, expected {}".format(self.name, len(layout), self.tileh)
+                if len(layout) > self.tileh:
+                    layout = layout[0:self.tileh]
+                minw, maxw = 16,0
+                for i, line in enumerate(layout):
+                    if len(line) < minw: minw = len(line)
+                    if len(line) > maxw:
+                        maxw = len(line)
+                        layout[i] = layout[i][0:self.tilew]
+                    while len(line) < minw: layout[i] += "0"
+                if minw < self.tilew:
+                    print "WARNING: in {}: layout width {} (min), expected {}".format(self.name, minw, self.tilew)
+                if maxw > self.tilew:
+                    print "WARNING: in {}: layout width {} (max), expected {}".format(self.name, maxw, self.tilew)
+                while len(layout) < self.tileh:
+                    layout.append("0"*self.tilew)
+                self.layout = layout
+            else:
+                self.layout = []
+                while len(self.layout) < self.tileh:
+                    self.layout.append("1"*self.tilew)
+                
+            self.palette = {}
+            for n in xrange(0,self.depth):
+                self.palette[n] = ["0"]*4
+            if "PALETTE" in params:
+                colors = re.findall('\w: \d+ [+-]?\d+ \d+ \d+', params["PALETTE"])
+                for c in colors:
+                    c = [s.strip() for s in c.split(':')]
+                    try:
+                        c[0] = int(c[0],16)
+                    except ValueError:
+                        print "WARNING: in {}: invalid palette entry {}".format(self.name, c[0])
+                        continue
+                    try:
+                        c[1] = [s.strip() for s in c[1].split(' ')][0:4]
+                    except IndexError:
+                        print "WARNING: in {}: malformed palette entry {}".format(self.name, c)
+                        continue
+                    self.palette[c[0]] = c[1]
+                    
+    try:
+        with open(os.path.join("tables","enemygfx.txt"),"r") as cfgf:
+            cfg = cfgf.read()
+    except:
+        print "ERROR: missing tables/enemygfx.txt, aborting enemy graphic changes"
+        return data_in
+    cfg = re.sub('#.*\n', ' ', cfg).strip()
+    cfg = re.sub('\s+', ' ', cfg).strip()
+    cfg = cfg.split("END;")
+    graphicdb = {}
+    for sprite in cfg:
+        if len(sprite.split(":")) >= 2:
+            name = sprite.split(":")[0].strip()
+            graphicdb[name] = MonsterGraphic(sprite)
+        
+    ## step 3: map monsters to graphics (two passes)
+    # pass 1:
+    # - determine exact constraints applied to monster for graphic & palette
+    # - assign graphics to monsters, reusing graphics whenever possible
+    for id, monster in monsterdb.items():
+        if not monster.used: continue
+        
+    # pass 2:
+    # - reassign graphics to (shuffled) monsters, favoring adding new graphics over reusing
+    #   - if a graphic is found for the first time, leave it in place and note it
+    #   - if a graphic is found for the second time, add a new graphic instead if there is room
+    #   - if there is not room, select a valid already-added graphic randomly
+    
+    ## step 4: build palettes
+    ## step 5: build graphic data & palette data
+    ## step 6: insert layout maps & set monster graphic datas
+
+    
+def insert_instruments(data_in, metadata_pos= False):
+    data = data_in
+    if not _isbeyondchaos:
+        print "** Inserting extended instrument samples ..."
     samplecfg = ConfigParser.ConfigParser()
-    samplecfg.read(os.path.join('tables', 'samples.txt'))
+    samplecfg.read(safepath(os.path.join('tables', 'samples.txt')))
         
     #pull out instrument infos
     sampleptrs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brrpointers').split(',')]
     if len(sampleptrs) != 2: sampleptrs = to_default('brrpointers')
     ptrdata = data[sampleptrs[0]:sampleptrs[1]+1]
-    #free_space(sampleptrs[0], sampleptrs[1])
     
     looplocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brrloops').split(',')]
     if len(looplocs) != 2: looplocs = to_default('brrloops')
     loopdata = data[looplocs[0]:looplocs[1]+1]
-    #free_space(looplocs[0], looplocs[1])
     
     pitchlocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brrpitch').split(',')]
     if len(pitchlocs) != 2: pitchlocs = to_default('brrpitch')
     pitchdata = data[pitchlocs[0]:pitchlocs[1]+1]
-    #free_space(pitchlocs[0], pitchlocs[1])
     
     adsrlocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'brradsr').split(',')]
     if len(adsrlocs) != 2: adsrlocs = to_default('brradsr')
     adsrdata = data[adsrlocs[0]:adsrlocs[1]+1]
-    #free_space(adsrlocs[0], adsrlocs[1])
     
     for id, smp in samplecfg.items('Samples'):
         id = int(id, 16)
@@ -1173,39 +1379,54 @@ def insert_instruments(data_in):
         pitchdata = byte_insert(pitchdata, (id-1)*2, pitch, 2)
         adsrdata = byte_insert(adsrdata, (id-1)*2, adsr, 2)
         
-    #data, s, e = put_somewhere(data, ptrdata, "POINTERS TO INSTRUMENT BRR DATA")
-    #CONFIG.set('MusicPtr', 'brrpointers', "{:x}, {:x}".format(s, e))
-    #locs = [int(st.strip(),16) for st in CONFIG.get('MusicPtr', 'brrpointerpointer').split(',')]
-    #print locs
-    #for i, l in enumerate(locs):
-    #    print "{:x} -> ".format(s+i+HIROM, l)
-    #    data = int_insert(data, l, s + i + HIROM, 3)
     data = byte_insert(data, sampleptrs[0], ptrdata)
     CONFIG.set('MusicPtr', 'brrpointers', "{:x}, {:x}".format(sampleptrs[0], sampleptrs[0]+len(data)))
+    if metadata_pos:
+        p = metadata_pos
+        metadata = "\x00"*0x600
+        metadata = byte_insert(metadata, 0x0, loopdata)
+        metadata = byte_insert(metadata, 0x200, pitchdata)
+        metadata = byte_insert(metadata, 0x400, adsrdata)
+        
+        CONFIG.set('MusicPtr', 'brrloops', "{:x}, {:x}".format(0+p, 0x1FF+p))
+        CONFIG.set('MusicPtr', 'brrpitch', "{:x}, {:x}".format(0x200+p, 0x3FF+p))
+        CONFIG.set('MusicPtr', 'brradsr', "{:x}, {:x}".format(0x400+p, 0x5FF+p))
+        
+        loc = int(CONFIG.get('MusicPtr', 'brrlooppointer'),16)
+        data = int_insert(data, loc, 0+p+HIROM, 3)
+        loc = int(CONFIG.get('MusicPtr', 'brrpitchpointer'),16)
+        data = int_insert(data, loc, 0x200+p+HIROM, 3)
+        loc = int(CONFIG.get('MusicPtr', 'brradsrpointer'),16)
+        data = int_insert(data, loc, 0x400+p+HIROM, 3)
+        
+        data = byte_insert(data, p, metadata)
+    else:
+        data, s, e = put_somewhere(data, loopdata, "INSTRUMENT LOOP DATA")
+        CONFIG.set('MusicPtr', 'brrloops', "{:x}, {:x}".format(s, e))
+        loc = int(CONFIG.get('MusicPtr', 'brrlooppointer'),16)
+        data = int_insert(data, loc, s + HIROM, 3)
 
-    data, s, e = put_somewhere(data, loopdata, "INSTRUMENT LOOP DATA")
-    CONFIG.set('MusicPtr', 'brrloops', "{:x}, {:x}".format(s, e))
-    loc = int(CONFIG.get('MusicPtr', 'brrlooppointer'),16)
-    data = int_insert(data, loc, s + HIROM, 3)
-    
-    data, s, e = put_somewhere(data, pitchdata, "INSTRUMENT PITCH DATA")
-    CONFIG.set('MusicPtr', 'brrpitch', "{:x}, {:x}".format(s, e))
-    loc = int(CONFIG.get('MusicPtr', 'brrpitchpointer'),16)
-    data = int_insert(data, loc, s + HIROM, 3)
-    
-    data, s, e = put_somewhere(data, adsrdata, "INSTRUMENT ADSR DATA")
-    CONFIG.set('MusicPtr', 'brradsr', "{:x}, {:x}".format(s, e))
-    loc = int(CONFIG.get('MusicPtr', 'brradsrpointer'),16)
-    data = int_insert(data, loc, s + HIROM, 3)
+        data, s, e = put_somewhere(data, pitchdata, "INSTRUMENT PITCH DATA")
+        CONFIG.set('MusicPtr', 'brrpitch', "{:x}, {:x}".format(s, e))
+        loc = int(CONFIG.get('MusicPtr', 'brrpitchpointer'),16)
+        data = int_insert(data, loc, s + HIROM, 3)
+
+        data, s, e = put_somewhere(data, adsrdata, "INSTRUMENT ADSR DATA")
+        CONFIG.set('MusicPtr', 'brradsr', "{:x}, {:x}".format(s, e))
+        loc = int(CONFIG.get('MusicPtr', 'brradsrpointer'),16)
+        data = int_insert(data, loc, s + HIROM, 3)
     
     return data
                 
 
-def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsonglist):
+def process_custom_music(data_in, eventmodes="", f_randomize=True, f_battleprog=True, f_mchaos=False, f_altsonglist=False):
     global freespace
     data = data_in
     freespacebackup = freespace
-    print "** Processing random music ..." if f_randomize else "** Processing custom music ..."
+    
+    if not _isbeyondchaos:
+        print "** Processing random music ..." if f_randomize else "** Processing custom music ..."
+    
     f_repeat = CONFIG.getboolean('Music', 'allow_music_repeats')
     f_preserve = CONFIG.getboolean('Music', 'preserve_song_data')
     isetlocs = [int(s.strip(),16) for s in CONFIG.get('MusicPtr', 'instruments').split(',')]
@@ -1264,8 +1485,8 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
         
     # build identifier table
     songconfig = ConfigParser.ConfigParser()
-    songconfig.read('defaultsongs.txt')
-    songconfig.read('songs.txt' if not f_altsonglist else 'songs_alt.txt')
+    songconfig.read(safepath(os.path.join('tables','defaultsongs.txt')))
+    songconfig.read(safepath(os.path.join('custom', 'songs.txt' if not f_altsonglist else 'songs_alt.txt')))
     songtable = {}
     for ss in songconfig.items('SongSlots'):
         vals = [s.strip() for s in ss[1].split(',')]
@@ -1291,14 +1512,25 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
     for song in songconfig.items('Imports'):
         canbe = [s.strip() for s in song[1].split(',')]
         intense, epic = 0, 0
+        event_mults = {}
         if f_mchaos:
             for ident, s in songtable.items():
                 s.choices.append(song[0])
         for c in canbe:
             if not c: continue
-            if c == "CONVERT":
-                pass #TODO
-            elif c[0] == "I":
+            if c[0] in eventmodes and ":" not in c:
+                try:
+                    event_mults[c[0]] = int(c[1:])
+                except ValueError:
+                    print "WARNING: in songs.txt: could not interpret '{}'".format(c)
+        static_mult = 1
+        for k, v in event_mults.items():
+            static_mult *= v
+        for c in canbe:
+            if not c: continue
+            if ":" in c and c[0] in eventmodes:
+                c = c.split(':', 1)[1]
+            if c[0] == "I":
                 intense = int(c[1:])
             elif c[0] == "E" or c[0] == "G":
                 epic = int(c[1:])
@@ -1309,10 +1541,9 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                     ch = ch[0]
                 else:
                     ch = c
-                    mult = 1
-                
+                    mult = 1 
                 if ch in songtable:
-                    songtable[ch].choices.extend([song[0]]*mult)
+                    songtable[ch].choices.extend([song[0]]*mult*static_mult)
         intense = max(0, min(intense, 99))
         epic = max(0, min(epic, 99))
         if (intense or epic):
@@ -1384,8 +1615,6 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
             battlechoices.sort(key=operator.itemgetter(1))
             battleprog = [None]*len(battleids)
             bossprog = [None]*len(bossids)
-            #battleprog[0] = battlechoices.pop(0)
-            #bossprog[0] = battlechoices.pop(-1)
             bosschoices = []
             battlechoices.sort(key=operator.itemgetter(2))
             for i in xrange(0, len(bossids)):
@@ -1407,8 +1636,8 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                     bt = min(ei,60) 
 
                     super, (si, sg) = rng.choice(intensity_subset(imin=bt, gmin=66).items())
-                    boss, (bi, bg) = rng.choice(intensity_subset(imin=bt, gmin=eg, gmax=sg).items())
-                    wt = max(bg, 50)
+                    boss, (bi, bg) = rng.choice(intensity_subset(imin=bt, gmin=max(22,eg), gmax=sg).items())
+                    wt = min(80,max(bg, 50))
                     balance = rng.sample(intensity_subset(imax=bt, gmax=wt).items(), 2)
                     if balance[0][1][0] + balance[0][1][1] > balance[1][1][0] + balance[1][1][1]:
                         boutside, (boi, bog) = balance[1]
@@ -1457,7 +1686,6 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
     def check_ids_fit():
         n_by_isets = (isetlocs[1] - isetlocs[0] + 1) / 0x20
         n_by_sptrs = (songptraddrs[1] - songptraddrs[0] + 1) / 3
-        #print "songtable {} isets {} sptrs {}".format(len(songtable), n_by_isets, n_by_sptrs)
         if len(songtable) > n_by_isets or len(songtable) > n_by_sptrs:
             return False
         return True
@@ -1476,12 +1704,12 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                     mml = mml + "\n$888{} r;".format(i)
         if sfx:
             try:
-                with open(os.path.join('music', sfx), 'r') as f:
+                with open(os.path.join(MUSIC_PATH, sfx), 'r') as f:
                     mml += f.read()
             except IOError:
                 print "couldn't open {}".format(sfx)
                 
-        return mml_to_akao(mml, name, True if (sfx and id != 0x29) else False)
+        return mml_to_akao(mml, name, True if (id == 0x4F) else False)
     
     def process_tierboss(opts):
         opts = [o.strip() for o in opts.split(',')]
@@ -1498,7 +1726,7 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
             tierfiles = []
             for n in tiernames:
                 try:
-                    with open(os.path.join('music', n + '_dm.mml'), 'r') as f:
+                    with open(os.path.join(MUSIC_PATH, n + '_dm.mml'), 'r') as f:
                         tierfiles.append(f.read())
                 except IOError:
                     print "couldn't open {}".format(n + '_dm.mml')
@@ -1510,9 +1738,11 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
             mml = re.sub('j([0-9]+),([0-9]+)', 'j\g<1>,555\g<2>', mml)
             mml = re.sub('([;:\$])([0-9]+)(?![,0-9])', '\g<1>555\g<2>', mml)
             mml = re.sub('([;:])555444([0-9])', '\g<1>222\g<2>', mml)
-            mml = re.sub('#VARIANT', '#', mml)
+            mml = re.sub('#VARIANT', '#', mml, flags=re.IGNORECASE)
             mml = re.sub('{.*?}', '', mml)
             mml = re.sub('\$555444([0-9])', '{\g<1>}', mml)
+            mml = re.sub('#def\s+(\S+)\s*=', '#def 555\g<1>=', mml, flags=re.IGNORECASE)
+            mml = re.sub("'(.*)'", "'555\g<1>'", mml)
             tierfiles[0] = mml
             
             mml = re.sub('[?!]', '', tierfiles[1])
@@ -1521,8 +1751,11 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
             mml = re.sub('([;:\$])([0-9]+)(?![,0-9])', '\g<1>666\g<2>', mml)
             mml = re.sub('([;:])666444([0-9])', '\g<1>333\g<2>', mml)
             mml = re.sub('\$666444([0-9])', '$222\g<1>', mml)
-            mml = re.sub('#VARIANT', '#', mml)
+            mml = re.sub('#VARIANT', '#', mml, flags=re.IGNORECASE)
             mml = re.sub('{.*?}', '', mml)
+            mml = re.sub('#def\s+(\S+)\s*=', '#def 666\g<1>=', mml, flags=re.IGNORECASE)
+            mml = re.sub("'(.*)'", "'666\g<1>'", mml)
+            mml = re.sub('"', ')', mml)
             tierfiles[1] = mml
             
             mml = re.sub('[?_]', '', tierfiles[2])
@@ -1530,14 +1763,16 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
             mml = re.sub('j([0-9]+),([0-9]+)', 'j\g<1>,777\g<2>', mml)
             mml = re.sub('([;:\$])([0-9]+)(?![,0-9])', '\g<1>777\g<2>', mml)
             mml = re.sub('\$777444([0-9])', '$333\g<1>', mml)
-            mml = re.sub('#VARIANT', '#', mml)
+            mml = re.sub('#VARIANT', '#', mml, flags=re.IGNORECASE)
             mml = re.sub('{.*?}', '', mml)
+            mml = re.sub('#def\s+(\S+)\s*=', '#def 777\g<1>=', mml, flags=re.IGNORECASE)
+            mml = re.sub("'(.*)'", "'777\g<1>'", mml)
+            mml = re.sub('"', '(', mml)
             tierfiles[2] = mml
             
             mml = "#VARIANT / \n#VARIANT ? ignore \n" + tierfiles[0] + tierfiles[1] + tierfiles[2]
-            
-            #with open('mydebug.mml', 'a+') as f:
-            #    f.seek(0,2)
+            ## uncomment to debug tierboss MML
+            #with open("lbdebug.mml", "w") as f:
             #    f.write(mml)
                 
             akao = mml_to_akao(mml, str(tiernames), variant='_default_')
@@ -1578,7 +1813,6 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                 if not choices: choices.append(native_prefix + ident)
                 newsong = rng.choice(choices)
                 if (newsong in used_songs) and (not f_repeat):
-                    #print "bounced setting {} as {}".format(newsong, ident)
                     keeptrying = True
                     break
                 else:
@@ -1595,9 +1829,9 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                 s.data, s.inst = process_tierboss(tierboss[ident])
                 s.is_pointer = False
             # case: get song from MML
-            elif os.path.isfile(os.path.join("music", s.changeto + ".mml")):
+            elif isfile(os.path.join(MUSIC_PATH, s.changeto + ".mml")):
                 try:
-                    with open(os.path.join("music", s.changeto + ".mml"), 'r') as mmlf:
+                    with open(os.path.join(MUSIC_PATH, s.changeto + ".mml"), 'r') as mmlf:
                         mml = mmlf.read()
                 except:
                     print "couldn't open {}.mml".format(s.changeto)
@@ -1618,7 +1852,7 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                         print "WARNING: instrument out of range in {}".format(s.changeto + ".mml")
                         
             # case: get song from source ROM
-            elif not os.path.isfile(os.path.join("music", s.changeto + "_data.bin")):
+            elif not isfile(os.path.join(MUSIC_PATH, s.changeto + "_data.bin")):
                 target = s.changeto[len(native_prefix):]
                 if (s.changeto[:len(native_prefix)] == native_prefix and
                         target in songtable):
@@ -1631,8 +1865,6 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                     else:
                         s.is_pointer = False
                         slen = bytes_to_int(data[loc:loc+2]) + 2
-                        #if data[loc+slen-1] == '\xF6': slen = slen + 2
-                        #if data[loc+slen-2] == '\xF6': slen = slen + 1
                         s.data = data[loc:loc+slen]
                     loc = isetlocs[0] + sid * isetsize
                     assert loc + isetsize <= isetlocs[1] + 1
@@ -1645,7 +1877,7 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                 s.is_pointer = False
                 # check instrument validity
                 try:
-                    fi = open(os.path.join("music", s.changeto + "_inst.bin"), "rb")
+                    fi = open(os.path.join(MUSIC_PATH, s.changeto + "_inst.bin"), "rb")
                     s.inst = fi.read()
                     fi.close()
                 except IOError:
@@ -1655,20 +1887,19 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                 if max(map(ord, s.inst)) > instcount:
                     # case: get nopatch version
                     try:
-                        fi = open(os.path.join("music", s.changeto + "_inst_nopatch.bin"), "rb")
+                        fi = open(os.path.join(MUSIC_PATH, s.changeto + "_inst_nopatch.bin"), "rb")
                         s.inst = fi.read()
                         fi.close()
                     except IOError:
                         dprint("translating inst file for id{} {}".format(s.id, s.changeto))
-                        #s.inst = translate_inst(ibin) #TODO
                         dprint("translation is NYI")
                     try:
-                        fi = open(os.path.join("music", s.changeto + "_data_nopatch.bin"), "rb")
+                        fi = open(os.path.join(MUSIC_PATH, s.changeto + "_data_nopatch.bin"), "rb")
                         s.data = fi.read()
                         fi.close()
                     except IOError:
                         try:
-                            fi = open(os.path.join("music", s.changeto + "_data.bin"), "rb")
+                            fi = open(os.path.join(MUSIC_PATH, s.changeto + "_data.bin"), "rb")
                             s.data = fi.read()
                             fi.close()
                         except IOError:
@@ -1678,7 +1909,7 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
                 else:
                     # case: get standard version
                     try:
-                        fi = open(os.path.join("music", s.changeto + "_data.bin"), "rb")
+                        fi = open(os.path.join(MUSIC_PATH, s.changeto + "_data.bin"), "rb")
                         s.data = fi.read()
                         fi.close()
                     except IOError:
@@ -1725,23 +1956,7 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
         songinst = data[isetlocs[0]:isetlocs[1]+1]    
         if f_moveinst: free_space(isetlocs[0], isetlocs[1])
         claim_space(songptraddrs[0], songptraddrs[0] + 3*(len(songtable)+1))
-        #dprint("    free space for music: {}".format(space))
         for ident, s in songtable.items():
-            #dprint("attempting to insert {} in slot {} ({})".format(s.changeto, s.id, ident))
-#            for i, l in enumerate(songdatalocs):
-#                if not s.is_pointer:
-#                    if space[i] >= len(s.data):
-#                        insertloc = l[0] + len(songdata[i])
-#                        songdata[i] += s.data
-#                        space[i] -= len(s.data)
-#                        songinst = byte_insert(songinst, s.id * isetsize, s.inst, isetsize)
-#                        songptrdata = int_insert(songptrdata, s.id * 3, insertloc + HIROM, 3)
-#                        songlocations[s.id] = insertloc
-#                        break
-#                    else:
-#                        songptrdata = int_insert(songptrdata, s.id * 3, s.data, 3)
-#                        songlocations[s.id] = s.data - HIROM
-#                        break
             if not s.is_pointer:
                 try:
                     data, start, end = put_somewhere(data, s.data, "  (song) [{:02x}] {}".format(s.id, s.changeto), True)
@@ -1789,17 +2004,7 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
         pausetable = "".join(map(chr, pausetable))
         
         
-    # write to rom
-    #if f_moveinst:
-        #songptrptr = int(CONFIG.get('MusicPtr', 'songpointerpointer'), 16)
-        #don't need to move song pointers because we are assuming it can just
-        #extend into the instrument space we are now freeing. may need to
-        #add contingency for if they are already separate later.
-        
-        #instlocptr = int(CONFIG.get('MusicPtr', 'instrumentpointer'), 16)
-        #data = int_insert(data, instlocptr, new_instloc[0] + HIROM, 3)
-        
-        
+    # write to rom        
     if f_battleprog:
         data = byte_insert(data, pausetableloc, pausetable, 5)
         data = byte_insert(data, battlesongsloc, battletable, 8)
@@ -1807,15 +2012,12 @@ def process_custom_music(data_in, f_randomize, f_battleprog, f_mchaos, f_altsong
     if not f_moveinst: songptrdata = songptrdata[:songptraddrs[1] + 1]
     data = byte_insert(data, songptraddrs[0], songptrdata)
     if f_moveinst:
-        #data = byte_insert(data, new_instloc[0], songinst, end=new_instloc[1])
         data, s, e = put_somewhere(data, songinst, "INSTRUMENT TABLES FOR SONGS")
         instlocptr = int(CONFIG.get('MusicPtr', 'instrumentpointer'), 16)
         data = int_insert(data, instlocptr, s + HIROM, 3)
     else:
         data = byte_insert(data, isetlocs[0], songinst, end=isetlocs[1])
-    #for i, l in enumerate(songdatalocs):
-    #    data = byte_insert(data, l[0], songdata[i], end=l[1])
-    
+
     # make spoiler
     changed_songs = {}
     for ident, s in songtable.items():
@@ -2426,6 +2628,24 @@ def mangle_magic(data_in):
     data = byte_insert(data, 0x046AC0, spells, end=0x0478BF)
     return data
     
+def validate_custom_music(data):
+    o_start = 0x53F95
+    o_end = 0x9FDFF
+    expected_sum = "cb137e71473d24ecfc5ff7030089793d"
+    
+    seg = data[o_start:o_end]
+    sum = hashlib.md5(seg).hexdigest()
+    if sum == expected_sum:
+        return True
+    else:
+        print "WARNING: The selected ROM does not appear to contain the unaltered, original FF6 music. The music randomizer depends on this to function. If you wish to attempt randomizing music anyway, type OKAY at the prompt (case sensitive). Otherwise, music will not be randomized."
+        print "(found md5 {}, expected {})".format(sum, expected_sum)
+        inp = raw_input(" >")
+        if inp == "OKAY":
+            print "Proceeding with music randomization."
+            return True
+    print "Music randomization cancelled."
+    return False
         
 def dothething():
     lastcfg = ConfigParser.ConfigParser(DEFAULT_DEFAULTS)
@@ -2434,12 +2654,23 @@ def dothething():
     def reseed(seed):
         rng.seed(seed+1)
         return seed+1
-        
+    
+    seed = None
+    inputfilename = None
+    modes = ""
+    
     print "Nascent Order supplemental randomizer for Final Fantasy VI by emberling"
     print "version {}".format(VERSION)
     print
-    if len(ARGS) > 2:
-        inputfilename = args[1].strip()
+    if len(ARGS) >= 3:
+        for arg in ARGS[2:]:
+            try:
+                seed = int(arg)
+            except ValueError:
+                modes = "{} {}".format(modes, arg).strip()
+    if len(ARGS) >= 2:
+        inputfilename = ARGS[1].strip()
+        print "Using file {}".format(inputfilename)
     else:
         lastfile = lastcfg.get('LastUsed', 'lastfile')
         print "Enter ROM filename, or press enter to use the same one as last time."
@@ -2486,9 +2717,13 @@ def dothething():
     header = data[:datastart]
     data = data[datastart:]
     
-    seed = raw_input("Enter seed, or press enter to use arbitrary seed: ").strip()
+    if not seed: seed = raw_input("Enter seed, or press enter to use arbitrary seed: ").strip()
+    try:
+        seed = int(seed)
+    except ValueError:
+        print "Invalid seed entered, using default (timer)"
+        seed = None
     if not seed: seed = int(time.time())
-    seed = int(seed)
     print "Using seed {}".format(seed)
     print
     rng.seed(seed)
@@ -2522,42 +2757,44 @@ def dothething():
         
     defaultmodes = [lastcfg.get('LastUsed', 'mlast').strip()] + [getsavedmode(n) for n in range(1,5)]
     defaultdescs = [""] + [getsavedmode(n, desc=True) for n in range(1,5)]
-    print
-    print "*** What do you want to do? ***"
-    print "Type the letter for every option you want,"
-    print "or press enter to use the same modes you used last time."
-    print
-    print "Last used modes: {}".format(defaultmodes[0])
-    print
-    print "Other saved modes:"
-    for n in xrange(1,5):
-        print "{} -- {}   {}".format(n, defaultmodes[n], "({})".format(defaultdescs[n]) if defaultdescs[n] else "")
-    print
-    print "Options: (lowercase)"
-    print "  b - create battle music progression"
-    print "  c - randomize character names, sprites, and portraits"
-    # g - script edits reflecting characters' randomized identities
-    print "  i - add extended instruments"
-    print "  n - convert oldcharname to class, and other tiny misc NaO flavored fixes"
-    print "  m - music randomizer"
-    print "  p - redo character palettes"
-    # s - randomize spell effects and graphics????
-    print "  x - replace placeholder portraits with zoomed-sprite portraits"
-    print
-    print "  Include a number 1-4 to save selected modes in that slot for future use"
-    print "keywords (all caps):"
-    print "  MUSICCHAOS - songs that change choose from the entire pool of available songs"
-    print "  ALTSONGLIST - uses songs_alt.txt instead of songs.txt for music config"
-    print "  ONEWINGEDLEAFER - battle music progression based on level, not area (inconsistent)"
-    print "  MESSMEUP - 'p' no longer applies updates to known incompatible sprites"
-    print "  DISNEY - (p) advanced state-of-the-art cel shader mode"
-    print "  GLOWSTICKS - (p) trance palettes for everyone"
-    print "  PIXELPARTY - 'x' applies to all portraits"
-    print "  TESTFILE - always outputs to mytest.[smc]"
-    print "  TELLMEWHY - adds info about random pools to spoiler"
-    print
-    modes = raw_input("Select modes: ").strip()
-    
+    if not modes:
+        print
+        print "*** What do you want to do? ***"
+        print "Type the letter for every option you want,"
+        print "or press enter to use the same modes you used last time."
+        print
+        print "Last used modes: {}".format(defaultmodes[0])
+        print
+        print "Other saved modes:"
+        for n in xrange(1,5):
+            print "{} -- {}   {}".format(n, defaultmodes[n], "({})".format(defaultdescs[n]) if defaultdescs[n] else "")
+        print
+        print "Options: (lowercase)"
+        print "  b - create battle music progression"
+        print "  c - randomize character names, sprites, and portraits"
+        # g - script edits reflecting characters' randomized identities
+        print "  i - add extended instruments"
+        print "  n - convert oldcharname to class, and other tiny misc NaO flavored fixes"
+        print "  m - music randomizer"
+        print "  p - redo character palettes"
+        # s - randomize spell effects and graphics????
+        print "  x - replace placeholder portraits with zoomed-sprite portraits"
+        print
+        print "  Include a number 1-4 to save selected modes in that slot for future use"
+        print "keywords (all caps):"
+        print "  MUSICCHAOS - songs that change choose from the entire pool of available songs"
+        print "  ALTSONGLIST - uses songs_alt.txt instead of songs.txt for music config"
+        print "  ONEWINGEDLEAFER - battle music progression based on level, not area (inconsistent)"
+        print "  MESSMEUP - 'p' no longer applies updates to known incompatible sprites"
+        print "  DISNEY - (p) advanced state-of-the-art cel shader mode"
+        print "  GLOWSTICKS - (p) trance palettes for everyone"
+        print "  PIXELPARTY - 'x' applies to all portraits"
+        print "  TESTFILE - always outputs to mytest.[smc]"
+        print "  TELLMEWHY - adds info about random pools to spoiler"
+        print
+        modes = raw_input("Select modes: ").strip()
+    else:
+        print "Using modes: {}".format(modes)
     
     modeschanged = True
     if len(modes) == 0:
@@ -2604,13 +2841,18 @@ def dothething():
         FLAGS.add('portraits')
         
     if 'i' in modes:
-        data = insert_instruments(data)
-        
+        try:
+            o_brrmeta = int(CONFIG.get('Music', 'brr_metadata_target_offset'),16)
+        except ValueError:
+            o_brrmeta = False
+        data = insert_instruments(data, o_brrmeta)
+            
     vseed = reseed(vseed)
     if 'm' in modes or 'b' in modes:
-        data = process_custom_music(data, 'm' in modes, 'b' in modes, 'MUSICCHAOS' in modes, 'ALTSONGLIST' in modes)
-        if 'b' in modes:
-            data = process_formation_music(data, 'NOFIELDSHUFFLE' not in modes)
+        if validate_custom_music(data):
+            data = process_custom_music(data, f_randomize='m' in modes, f_battleprog='b' in modes, f_mchaos='MUSICCHAOS' in modes, f_altsonglist='ALTSONGLIST' in modes)
+            if 'b' in modes:
+                data = process_formation_music(data, 'NOFIELDSHUFFLE' not in modes)
     
     vseed = reseed(vseed)
     if 'c' in modes:
@@ -2676,7 +2918,7 @@ if __name__ == "__main__":
     TO_BATTLETEXT = maketrans(externtext, battletext)
     FROM_BATTLETEXT = maketrans(battletext, externtext)
     try:
-        CONFIG.read('config.txt')
+        CONFIG.read(os.path.join('custom','config.txt'))
         dothething()
         print
         raw_input("Processing complete. Press enter to close.")

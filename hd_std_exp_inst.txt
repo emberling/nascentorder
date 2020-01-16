@@ -1,0 +1,11 @@
+# pointer locations to load if standard expanded instrument metadata locations are found
+[MusicPtr]
+# start and end location for instrument loop info
+brrloops: 310000, 3101FF
+
+# start and end location for instrument pitch info
+brrpitch: 310200, 3103FF
+
+# start and end location for instrument ADSR info
+brradsr: 310400, 3105FF
+

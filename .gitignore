@@ -1,0 +1,5 @@
+*.pyc
+build.bat
+lastused.cfg
+*.smc
+mytest.txt
