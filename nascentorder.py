@@ -2994,7 +2994,7 @@ def dothething():
         print("  c - randomize character names, sprites, and portraits")
         # g - script edits reflecting characters' randomized identities
         print("  g - randomize guest character sprites, including Imp, Morph and Kefka")
-        print("  i - add extended instruments")
+        #print("  i - add extended instruments")
         #print("  n - convert oldcharname to class, and other tiny misc NaO flavored fixes")
         print("  m - music randomizer")
         print("  n - randomize NPC sprites")
@@ -3063,7 +3063,7 @@ def dothething():
     if 'x' in modes:
         FLAGS.add('portraits')
         
-    if 'i' in modes:
+    if 'i' in modes or 'm' in modes:
         try:
             o_brrmeta = int(CONFIG.get('Music', 'brr_metadata_target_offset'),16)
         except ValueError:
