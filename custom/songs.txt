@@ -504,12 +504,3 @@ dmad123: ff6_tier1, ff6_tier2, ff6_tier3, cc_flame, ff3_eureka, ff8_witches, ffm
 52: dmad4,      0
 53: ending1,    0    
 54: ending2,    0
-55: tomb,       100
-56: dream,      100
-57: ancient,    100
-58: phoenix,    100
-59: gate,       100
-5A: mount2,     100
-5B: engine,     100
-5C: village,    100
-5D: assault,    100
