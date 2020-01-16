@@ -373,7 +373,7 @@ def shuffle_char_hues(source_hues):
     hues = list(map(hue_rgb, source_hues))
     while True:
         tryagain = False
-        rng.shuffle(hues)
+        random.shuffle(hues)
         for v in range(0,18,3): #check for too close colors vertically (within one palette)
             chunk = hues[v:v+3]
             for i in range(len(chunk)):
@@ -622,23 +622,23 @@ def process_sprite_imports(data_in):
             spriteopts = [s[0] for s in spriteopts if s[0].uniqueid not in uniqueids_used and s[0].name not in sprites_used]
             #assign gender & name
             if a.gender not in ["female", "male", "neutral"]:
-                a.gender = rng.choice(["female"]*9 + ["male"]*9 + ["neutral"]*2)
-            spriteopts = [s for s in spriteopts if s.gender == a.gender or (s.gender == "neutral" and rng.choice([True, False]))]
+                a.gender = random.choice(["female"]*9 + ["male"]*9 + ["neutral"]*2)
+            spriteopts = [s for s in spriteopts if s.gender == a.gender or (s.gender == "neutral" and random.choice([True, False]))]
             if not spriteopts:
                 retry = True
                 break
             if id <= 13:
                 nameopts = set([n for n in allnames[a.gender] if n[0] not in initials_used])
                 for n in allnames["neutral"]:
-                    if n[0] not in initials_used and rng.choice([True, False]):
+                    if n[0] not in initials_used and random.choice([True, False]):
                         nameopts.add(n)
                 if not nameopts:
                     retry = True
                     break
-                a.name = rng.choice(list(nameopts))
+                a.name = random.choice(list(nameopts))
                 initials_used.add(a.name[0])
             #check filesize (nyi, everything is full size atm)
-            thissprite = rng.choice(spriteopts)
+            thissprite = random.choice(spriteopts)
             #print "{}: {} out of {}".format(a.desc, thissprite.name, [s.name for s in spriteopts])
             try:
                 size = sizedb[a.size]
@@ -885,12 +885,12 @@ def process_char_palettes(data_in, f_cel, f_rave):
     
     ## assign palettes to characters
     old_pals = list(data[o_charpals:o_charpals+22])
-    twinpal = rng.randint(0,5)
+    twinpal = random.randint(0,5)
     char_palettes_forced = list(range(0,6)) + list(range(0,6))
     char_palettes_forced.remove(twinpal)
-    char_palettes_forced.append(rng.choice(list(range(0,twinpal))+list(range(twinpal+0,6))))
+    char_palettes_forced.append(random.choice(list(range(0,twinpal))+list(range(twinpal+0,6))))
     while char_palettes_forced[0] == twinpal or char_palettes_forced[1] == twinpal:
-        rng.shuffle(char_palettes_forced)
+        random.shuffle(char_palettes_forced)
     sprite_palettes = char_palettes_forced[:4] + [twinpal, twinpal] + char_palettes_forced[4:]
     
     # by actor
@@ -911,7 +911,7 @@ def process_char_palettes(data_in, f_cel, f_rave):
     if 'moogles' in offsets:
         if offsets['moogles']:
             moogle_pals = list(range(0,6)) * 2
-            rng.shuffle(moogle_pals)
+            random.shuffle(moogle_pals)
             for i, loc in enumerate([int(s.strip(),16) for s in offsets['moogles'].split(',')]):
                 data = int_insert(data, loc, sprite_palettes[c], 1)
 
@@ -966,13 +966,13 @@ def process_char_palettes(data_in, f_cel, f_rave):
     def nudge_hue(hue): #designed for 'pure' hue: one 31, one 0, one anything
         new_color = hue[:]
         if len([h for h in hue if h not in [0, 31] ]) > 0:
-            new_color = [(h if h in [0,31] else h + rng.randint(-2,2)) for h in hue]
+            new_color = [(h if h in [0,31] else h + random.randint(-2,2)) for h in hue]
         elif len([h for h in hue if h == 31]) >= 2:
-            nudge_idx = rng.choice([i for i, h in enumerate(hue) if h == 31])
-            new_color[nudge_idx] -= rng.randint(0,3)
+            nudge_idx = random.choice([i for i, h in enumerate(hue) if h == 31])
+            new_color[nudge_idx] -= random.randint(0,3)
         elif 0 in hue:
-            nudge_idx = rng.choice([i for i, h in enumerate(hue) if h == 0])
-            new_color[nudge_idx] += rng.randint(0,3)
+            nudge_idx = random.choice([i for i, h in enumerate(hue) if h == 0])
+            new_color[nudge_idx] += random.randint(0,3)
         new_color = [(c if c <= 31 else 31) for c in new_color]
         new_color = [(c if c >= 0 else 0) for c in new_color] # just in case
         return new_color
@@ -999,16 +999,16 @@ def process_char_palettes(data_in, f_cel, f_rave):
         new_palette = [[0,0,0], [3,3,3]] + list(skintone)
         new_palette = list(map(components_to_color, new_palette)) * 4
         
-        hair_sat = rng.choice([rng.randint(15,30), rng.randint(20,50), rng.randint(20,75)])
-        hair_light = rng.choice([rng.randint(60,80), rng.randint(55,90)])
-        hair_dark = rng.randint(int(hair_light * .5),int(hair_light * .65)) if hair_sat < 40 else \
-                    rng.randint(int(hair_light * .45),int(hair_light * .52))
-        hair_highlight = rng.randint(93,100)
-        hair_shadow = rng.randint(10,22)
+        hair_sat = random.choice([random.randint(15,30), random.randint(20,50), random.randint(20,75)])
+        hair_light = random.choice([random.randint(60,80), random.randint(55,90)])
+        hair_dark = random.randint(int(hair_light * .5),int(hair_light * .65)) if hair_sat < 40 else \
+                    random.randint(int(hair_light * .45),int(hair_light * .52))
+        hair_highlight = random.randint(93,100)
+        hair_shadow = random.randint(10,22)
         
-        cloth_sat = rng.choice([rng.randint(10,50), rng.randint(30,60), rng.randint(10,85)])
-        cloth_light = rng.randint(32, max(42,hair_dark + 10))
-        cloth_dark = rng.randint(int(cloth_light * .6), int(cloth_light * .72))
+        cloth_sat = random.choice([random.randint(10,50), random.randint(30,60), random.randint(10,85)])
+        cloth_light = random.randint(32, max(42,hair_dark + 10))
+        cloth_dark = random.randint(int(cloth_light * .6), int(cloth_light * .72))
         #print(("generating palette. level report:\n hair -- {}, {}, {}, {}\n cloth -- {}, {}".format(hair_highlight, hair_light, hair_dark, hair_shadow, cloth_light, cloth_dark)))
         while hair_light >= hair_highlight - 8:
             #print(("separating hair & highlight: hair {}   highlight {}".format(hair_light, hair_highlight)))
@@ -1042,41 +1042,41 @@ def process_char_palettes(data_in, f_cel, f_rave):
                 else: done |= 0b01
                 cycle = 1
         #if cycle: print(("results: \n hair -- {}, {}, {}, {}\n cloth -- {}, {}".format(hair_highlight, hair_light, hair_dark, hair_shadow, cloth_light, cloth_dark)))
-        new_palette[2] = components_to_color(hsv_approx(nudge_hue(hair_hue), rng.randint(80,97), rng.randint(93,98)))
-        new_palette[3] = components_to_color(hsv_approx(nudge_hue(hair_hue), rng.randint(10,100), hair_shadow))
-        new_palette[4] = components_to_color(hsv_approx(nudge_hue(hair_hue), hair_sat + rng.randint(-7,8), hair_light))
-        new_palette[5] = components_to_color(hsv_approx(nudge_hue(hair_hue), hair_sat + rng.randint(-7,8), hair_dark))
-        new_palette[8] = components_to_color(hsv_approx(nudge_hue(cloth_hue), cloth_sat + rng.randint(-7,8), cloth_light))
-        new_palette[9] = components_to_color(hsv_approx(nudge_hue(cloth_hue), cloth_sat + rng.randint(-7,8), cloth_dark))
+        new_palette[2] = components_to_color(hsv_approx(nudge_hue(hair_hue), random.randint(80,97), random.randint(93,98)))
+        new_palette[3] = components_to_color(hsv_approx(nudge_hue(hair_hue), random.randint(10,100), hair_shadow))
+        new_palette[4] = components_to_color(hsv_approx(nudge_hue(hair_hue), hair_sat + random.randint(-7,8), hair_light))
+        new_palette[5] = components_to_color(hsv_approx(nudge_hue(hair_hue), hair_sat + random.randint(-7,8), hair_dark))
+        new_palette[8] = components_to_color(hsv_approx(nudge_hue(cloth_hue), cloth_sat + random.randint(-7,8), cloth_light))
+        new_palette[9] = components_to_color(hsv_approx(nudge_hue(cloth_hue), cloth_sat + random.randint(-7,8), cloth_dark))
         
-        acc_sat = rng.choice([rng.randint(10,25)] + [rng.randint(25,65)]*2 + [rng.randint(20,85)]*2)
-        acc_light = rng.randint(cloth_light + 10,min(100,max(80,cloth_light + 20)))
-        acc_dark = rng.randint(int(acc_light * .5), int(acc_light * .68)) if acc_sat < 50 else \
-                   rng.randint(int(acc_light * .4), int(acc_light * .52))
-        new_palette[10] = components_to_color(hsv_approx(nudge_hue(acc_hue), acc_sat + rng.randint(-7,8), acc_light))
-        new_palette[11] = components_to_color(hsv_approx(nudge_hue(acc_hue), acc_sat + rng.randint(-7,8), acc_dark))
+        acc_sat = random.choice([random.randint(10,25)] + [random.randint(25,65)]*2 + [random.randint(20,85)]*2)
+        acc_light = random.randint(cloth_light + 10,min(100,max(80,cloth_light + 20)))
+        acc_dark = random.randint(int(acc_light * .5), int(acc_light * .68)) if acc_sat < 50 else \
+                   random.randint(int(acc_light * .4), int(acc_light * .52))
+        new_palette[10] = components_to_color(hsv_approx(nudge_hue(acc_hue), acc_sat + random.randint(-7,8), acc_light))
+        new_palette[11] = components_to_color(hsv_approx(nudge_hue(acc_hue), acc_sat + random.randint(-7,8), acc_dark))
         
         hues = [guess_hue(hair_hue), guess_hue(cloth_hue), guess_hue(acc_hue)]
         used_range = set(range(hues[0]-15, hues[0]+15))
         used_range.update(set(range(hues[1]-15, hues[1]+15)))
         used_range.update(set(range(hues[2]-15, hues[2]+15)))
         used_range.update([n-360 for n in used_range if n > 360])
-        town_hue = rng.choice([n for n in range(0,360) if n not in used_range])
+        town_hue = random.choice([n for n in range(0,360) if n not in used_range])
         town_hue = nudge_apart(town_hue, skin_hue)
-        town_sat = rng.choice([rng.randint(10,50), rng.randint(30,50), rng.randint(10,65)])
-        town_light = rng.randint(cloth_light, hair_light)
-        town_dark = rng.randint(int(town_light * .6), int(town_light * .65))
-        new_palette[12] = components_to_color(hsv_approx(nudge_hue(hue_rgb(town_hue)), town_sat + rng.randint(-7,8), town_dark))
-        new_palette[13] = components_to_color(hsv_approx(nudge_hue(hue_rgb(town_hue)), town_sat + rng.randint(-7,8), town_light))
+        town_sat = random.choice([random.randint(10,50), random.randint(30,50), random.randint(10,65)])
+        town_light = random.randint(cloth_light, hair_light)
+        town_dark = random.randint(int(town_light * .6), int(town_light * .65))
+        new_palette[12] = components_to_color(hsv_approx(nudge_hue(hue_rgb(town_hue)), town_sat + random.randint(-7,8), town_dark))
+        new_palette[13] = components_to_color(hsv_approx(nudge_hue(hue_rgb(town_hue)), town_sat + random.randint(-7,8), town_light))
         
         used_range.update(range(town_hue-15, town_hue+15))
-        aux_hue = rng.choice([n for n in range(0,360) if n not in used_range])
+        aux_hue = random.choice([n for n in range(0,360) if n not in used_range])
         aux_hue = nudge_apart(aux_hue, skin_hue)
-        aux_sat = rng.choice([rng.randint(15,30), rng.randint(20,50)])
-        aux_light = rng.choice([rng.randint(min(town_light+15,90), 100), max(40, town_light - rng.randint(10,20))])
-        aux_dark = rng.randint(int(aux_light * .55), int(aux_light * .65))
-        new_palette[14] = components_to_color(hsv_approx(nudge_hue(hue_rgb(aux_hue)), town_sat + rng.randint(-7,8), aux_dark))
-        new_palette[15] = components_to_color(hsv_approx(nudge_hue(hue_rgb(aux_hue)), town_sat + rng.randint(-7,8), aux_light))
+        aux_sat = random.choice([random.randint(15,30), random.randint(20,50)])
+        aux_light = random.choice([random.randint(min(town_light+15,90), 100), max(40, town_light - random.randint(10,20))])
+        aux_dark = random.randint(int(aux_light * .55), int(aux_light * .65))
+        new_palette[14] = components_to_color(hsv_approx(nudge_hue(hue_rgb(aux_hue)), town_sat + random.randint(-7,8), aux_dark))
+        new_palette[15] = components_to_color(hsv_approx(nudge_hue(hue_rgb(aux_hue)), town_sat + random.randint(-7,8), aux_light))
         
         if f_cel:
             for i in [5, 7, 9, 11]:
@@ -1087,15 +1087,15 @@ def process_char_palettes(data_in, f_cel, f_rave):
         return new_palette
     
     def generate_trance_palette(f_cel):
-        sign = rng.choice([1, -1])
-        hues = [rng.randint(0,360)] # skin
+        sign = random.choice([1, -1])
+        hues = [random.randint(0,360)] # skin
         if hues[0] in range(20,40): # -- discourage skin-colored skin
-            hues[0] = rng.randint(0,360)
-        hues.append(hues[0] + rng.randint(15,60) * sign) # hair
-        hues.append(hues[1] + rng.randint(15,60) * sign) # clothes
-        hues.append(hues[2] + rng.randint(15,60) * sign) # acc
-        hues.append(rng.randint(0,360)) #town
-        hues.append(rng.randint(0,360)) #aux
+            hues[0] = random.randint(0,360)
+        hues.append(hues[0] + random.randint(15,60) * sign) # hair
+        hues.append(hues[1] + random.randint(15,60) * sign) # clothes
+        hues.append(hues[2] + random.randint(15,60) * sign) # acc
+        hues.append(random.randint(0,360)) #town
+        hues.append(random.randint(0,360)) #aux
         
         new_palette = [[0, 0, 0], [3, 3, 3]] * 8
         
@@ -1103,11 +1103,11 @@ def process_char_palettes(data_in, f_cel, f_rave):
         for i, h in enumerate(hues):
             while hues[i] < 0: hues[i] += 360
             while hues[i] >= 360: hues[i] -= 360
-            sats.append(rng.randint(80,100))
-            vals.append(rng.randint(80,100))
+            sats.append(random.randint(80,100))
+            vals.append(random.randint(80,100))
         
         new_palette[2]  = [31, 31, 31]
-        new_palette[3]  = hsv_approx(nudge_hue(hue_rgb(hues[1])), sats[1], rng.randint(15,30))
+        new_palette[3]  = hsv_approx(nudge_hue(hue_rgb(hues[1])), sats[1], random.randint(15,30))
         new_palette[4]  = hsv_approx(nudge_hue(hue_rgb(hues[1])), sats[1], vals[1])
         new_palette[5]  = hsv_approx(nudge_hue(hue_rgb(hues[1])), sats[1], vals[1] * .66)
         new_palette[6]  = hsv_approx(nudge_hue(hue_rgb(hues[0])), sats[0], vals[0])
@@ -1135,7 +1135,7 @@ def process_char_palettes(data_in, f_cel, f_rave):
         components = [int(t.strip()) for t in s.split(',')]
         skintones.append(tuple((tuple(components[0:3]), tuple(components[3:6]))))
     
-    rng.shuffle(skintones)
+    random.shuffle(skintones)
     
     new_palettes = []
     for p in range(0,6):
@@ -1510,11 +1510,14 @@ def process_custom_music(data_in, eventmodes="", opera=None, f_randomize=True, f
         elif name.endswith("_tr"):
             name = name[:-3]
         if idx == 0x29 or idx == 0x4F or (idx == 0x5D and windy_intro):
-            return usage_id(name) + "_sfx"
+            #return usage_id(name) + "_sfx"
+            return name + "_sfx"
         elif idx == 0x20:
-            return usage_id(name) + "_tr"
+            #return usage_id(name) + "_tr"
+            return name + "_tr"
         elif idx == 0x2F:
-            return usage_id(name) + "_vic"
+            #return usage_id(name) + "_vic"
+            return name + "_vic"
         else:
             return name
         
@@ -2379,7 +2382,7 @@ def process_formation_music(data, f_shufflefield):
             auxdata = byte_insert(auxdata, loc, byte)
             continue
         if song == 1 and not keepfield:
-            if rng.randint(0, 20 + maxlevel) < (20 + formlevels[i]):
+            if random.randint(0, 20 + maxlevel) < (20 + formlevels[i]):
                 song = 2
                 byte = (byte & 0b11000111) | (song << 3)
         elif keepfield or (song not in [2, 5]):
@@ -2399,7 +2402,7 @@ def process_formation_music(data, f_shufflefield):
             if f_shufflefield and (f_bylevel or song != 7):
                 fieldchance = int(CONFIG.get('Music', 'field_music_chance').strip())
                 if fieldchance > 100 or fieldchance < 0: fieldchance = to_default('field_music_chance')
-                if  rng.randint(1,100) > fieldchance:
+                if  random.randint(1,100) > fieldchance:
                     byte &= 0b01111111
                     fanfare = True
                 else:
@@ -2694,7 +2697,7 @@ def mangle_magic(data_in):
             usedlayers = ""
             mustbe, mustnot = parse_constraints(constraints)
             isalready = set()
-            count = rng.choice([1] + [2]*12 + [3]*66 + [4])
+            count = random.choice([1] + [2]*12 + [3]*66 + [4])
             anims = []
             role = "core"
             #print "creating animation with {} elements".format(count)
@@ -2705,7 +2708,7 @@ def mangle_magic(data_in):
                 if count - len(anims) == 1:
                     thismustbe = mustbe
                 else:
-                    thismustbe = set([c for c in mustbe if rng.randint(0,1) and c not in isalready])
+                    thismustbe = set([c for c in mustbe if random.randint(0,1) and c not in isalready])
                 #print " this element must be {}".format(thismustbe)
                 opts = [fx for fx in FXDB if role in fx.role]
                 #print " found {} options matching role".format(len(opts))
@@ -2732,7 +2735,7 @@ def mangle_magic(data_in):
                     #print " no options, restarting"
                     break
                     
-                anims.append(rng.choice(opts))
+                anims.append(random.choice(opts))
                 #print " chose {}".format(anims[-1])
                 if 's' in anims[-1].layer:
                     aout.spr = SpellAnimSub(anims[-1].id, 0x9D)
@@ -2834,7 +2837,8 @@ def dothething():
     lastcfg.read('lastused.cfg')
     
     def reseed(seed):
-        rng.seed(seed+1)
+        print(f"seeding with {seed}")
+        random.seed(seed+1)
         return seed+1
     
     seed = None
@@ -2908,8 +2912,7 @@ def dothething():
     if not seed: seed = int(time.time())
     print("Using seed {}".format(seed))
     print()
-    rng.seed(seed)
-    random = rng
+    random.seed(seed)
     vseed = seed
     
     # detect known romhacks
@@ -3093,7 +3096,7 @@ def dothething():
 if __name__ == "__main__":
     ARGS = list(sys.argv)
     CONFIG = configparser.RawConfigParser(CONFIG_DEFAULTS)
-    rng = random.Random()
+    random = random.Random()
     
     externtext = b' ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?/:"`-.,_;#+()%~*@'
     #battletext = b"\xFE" + b"".join(map(bytes, list(range(0x80,0xD1))))
