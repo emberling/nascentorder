@@ -265,7 +265,7 @@ def claim_space(startc, endc):
     
 #expects tag/req pairs encased in longer iterables, for some reason.
 #why? i have no idea, and i wrote this two days ago. *shrug*
-def constraint_filter(choices, choices_idx, given, given_idx=0):
+def constraint_filter(choices, choices_idx, given, given_idx=0, eq=None):
     while len(given) < given_idx+2:
         given.append([])
     tags = given[given_idx]
@@ -276,8 +276,18 @@ def constraint_filter(choices, choices_idx, given, given_idx=0):
     if isinstance(constraints, str):
         constraints = constraints.split(' ')
     constraints = [s.strip() for s in constraints if len(s.strip()) > 1]
+    idtags_raw = [s[1:] for s in constraints if s[0] == "#"]
     mustbe = [s[1:] for s in constraints if s[0] == '+']
     mustnot = [s[1:] for s in constraints if s[0] == '-']
+    idtags = []
+    for tag in idtags_raw:
+        try:
+            tagid = int(tag, 16)
+        except ValueError:
+            print(f"invalid id tag '#{tag}'")
+            continue
+        idtags.append(tagid)
+        
     choices = list(choices)
     for i, c in enumerate(choices):
         c = list(c)
@@ -294,9 +304,22 @@ def constraint_filter(choices, choices_idx, given, given_idx=0):
     newchoices = []
     for c in choices:
         ctags = c[choices_idx]
+        idtags_raw = [s[1:] for s in c[choices_idx+1] if s[0] == "#"]
         cmustbe = [s[1:] for s in c[choices_idx+1] if s[0] == '+']
         cmustnot = [s[1:] for s in c[choices_idx+1] if s[0] == '-']
+        idtags = []
+        for tag in idtags_raw:
+            try:
+                tagid = int(tag, 16)
+            except ValueError:
+                print(f"invalid id tag '#{tag}' in constraint set {c}")
+                continue
+            idtags.append(tagid)
+            
         mightwork = True
+        if eq is not None and eq not in idtags:
+            mightwork = False
+            continue
         for m in mustbe:
             if m not in ctags:
                 mightwork = False
@@ -503,7 +526,7 @@ def unfuck_portraits(data, f_merchant=False):
     return data
     
     
-def process_sprite_imports(data_in):
+def process_sprite_imports(data_in, charlist, rename=True, id_restrict=False):
     
     o_charnames = 0x478C0
     o_sprites = 0x150000
@@ -617,28 +640,40 @@ def process_sprite_imports(data_in):
         spoilertxt = []
         for a in allactors: 
             id = int(a.id, 16) 
+            if id not in charlist: continue
             # constraints & purge dupes
-            spriteopts = constraint_filter([(s, s.tags, s.reqs) for s in allsprites], 1, (a.tags, a.reqs))
+            eq = id if id_restrict else None
+            if eq and eq > 13:
+                eq = None
+                print(f"eq {eq}")
+            spriteopts = constraint_filter([(s, s.tags, s.reqs) for s in allsprites], 1, (a.tags, a.reqs), eq=eq)
             spriteopts = [s[0] for s in spriteopts if s[0].uniqueid not in uniqueids_used and s[0].name not in sprites_used]
+            print(spriteopts)
             #assign gender & name
-            if a.gender not in ["female", "male", "neutral"]:
-                a.gender = random.choice(["female"]*9 + ["male"]*9 + ["neutral"]*2)
-            spriteopts = [s for s in spriteopts if s.gender == a.gender or (s.gender == "neutral" and random.choice([True, False]))]
+            if a.gender in ["female", "male", "neutral"]:
+                spriteopts = [s for s in spriteopts if s.gender == a.gender or (s.gender == "neutral" and random.choice([True, False]))]
             if not spriteopts:
+                print("no sprite options, retrying")
                 retry = True
                 break
+            thissprite = random.choice(spriteopts)
+            
+            if a.gender not in ["female", "male", "neutral"]:
+                a.gender = thissprite.gender if thissprite.gender in ["female", "male", "neutral"] else "neutral"
+                if a.gender == "neutral":
+                    a.gender = random.choice(["male"] * 9 + ["female"] * 9 + ["neutral"] * 2)
             if id <= 13:
                 nameopts = set([n for n in allnames[a.gender] if n[0] not in initials_used])
                 for n in allnames["neutral"]:
                     if n[0] not in initials_used and random.choice([True, False]):
                         nameopts.add(n)
                 if not nameopts:
+                    print("no name options, retrying")
                     retry = True
                     break
                 a.name = random.choice(list(nameopts))
                 initials_used.add(a.name[0])
             #check filesize (nyi, everything is full size atm)
-            thissprite = random.choice(spriteopts)
             #print "{}: {} out of {}".format(a.desc, thissprite.name, [s.name for s in spriteopts])
             try:
                 size = sizedb[a.size]
@@ -704,7 +739,7 @@ def process_sprite_imports(data_in):
             sdata = spritemap[a.size].build(sdata)
             
             #write
-            if id <= 13:
+            if id <= 13 and rename:
                 romname = bytes(a.name, encoding="latin-1").translate(TO_BATTLETEXT)
                 while len(romname) < 6: romname = romname + b"\xFF"
                 if len(romname) > 6: romname = romname[:6]
@@ -2958,11 +2993,14 @@ def dothething():
         print("  b - create battle music progression")
         print("  c - randomize character names, sprites, and portraits")
         # g - script edits reflecting characters' randomized identities
+        print("  g - randomize guest character sprites, including Imp, Morph and Kefka")
         print("  i - add extended instruments")
-        print("  n - convert oldcharname to class, and other tiny misc NaO flavored fixes")
+        #print("  n - convert oldcharname to class, and other tiny misc NaO flavored fixes")
         print("  m - music randomizer")
+        print("  n - randomize NPC sprites")
         print("  p - redo character palettes")
         # s - randomize spell effects and graphics????
+        print("  w - (Worlds Collide sprite mode) *lightly* randomize character sprites and portraits, leaving characters recognizable")
         print("  x - replace placeholder portraits with zoomed-sprite portraits")
         print()
         print("  Include a number 1-4 to save selected modes in that slot for future use")
@@ -3040,8 +3078,15 @@ def dothething():
                 data = process_formation_music(data, 'NOFIELDSHUFFLE' not in modes)
     
     vseed = reseed(vseed)
-    if 'c' in modes:
-        data = process_sprite_imports(data)
+    characters_to_replace = []
+    if 'c' in modes or 'w' in modes:
+        characters_to_replace.extend(list(range(14)))
+    if 'g' in modes:
+        characters_to_replace.extend(list(range(14,22)))
+    if 'n' in modes:
+        characters_to_replace.extend(list(range(22,0x3F)))
+    if characters_to_replace:
+        data = process_sprite_imports(data, characters_to_replace, rename=('c' in modes), id_restrict=('w' in modes))
         
     vseed = reseed(vseed)
     if 'p' in modes:
@@ -3059,9 +3104,9 @@ def dothething():
         data = process_actor_events(data)
         data = process_npcdb(data)
         
-    vseed = reseed(vseed)
-    if 'n' in modes:
-        data = process_misc_fixes(data)
+    #vseed = reseed(vseed)
+    #if 'n' in modes:
+    #    data = process_misc_fixes(data)
         
     vseed = reseed(vseed)
     if 'MANGLEMAGIC' in modes:
