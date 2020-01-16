@@ -1,5 +1,6 @@
+#!/usr/bin/env python3
+
 import sys, os, re, traceback, copy
-from string import maketrans
 from mmltbl import *
 
 mml_log = "\n" if __name__ == "__main__" else None
@@ -26,7 +27,7 @@ def int_insert(data, position, newdata, length, reversed=True):
 def warn(fileid, cmd, msg):
     global mml_log
     m = "{}: WARNING: in {:<10}: {}".format(fileid, cmd, msg)
-    print m
+    print(m)
     if __name__ == "__main__": mml_log += m + '\n'
 
 def mlog(msg):
@@ -83,7 +84,7 @@ def mml_to_akao(mml, fileid='mml', sfxmode=False, variant=None):
                     tokens[1] = tokens[1][0:len(tokens[2])]
                 else:
                     tokens[2] = tokens[2][0:len(tokens[1])]
-            transes.append(maketrans(tokens[1], tokens[2]))
+            transes.append(str.maketrans(tokens[1], tokens[2]))
     for trans in transes:
         newmml = []
         for line in mml:
@@ -112,13 +113,13 @@ def mml_to_akao(mml, fileid='mml', sfxmode=False, variant=None):
             all_delims.update(tokens[0])
             variants[tokens[1]] = tokens[0]
             if makedefault: variants["_default_"] = tokens[0]
-    for k, v in variants.items():
+    for k, v in list(variants.items()):
         variants[k] = "".join([c for c in all_delims if c not in variants[k]])
     if not variants:
         variants['_default_'] = ''.join([c for c in all_delims])
     if variant:
         if variant not in variants:
-            print "mml error: requested unknown variant '{}'\n".format(variant)
+            print("mml error: requested unknown variant '{}'\n".format(variant))
         variants = {variant: variants[variant]}
         
     #generate instruments
@@ -130,7 +131,7 @@ def mml_to_akao(mml, fileid='mml', sfxmode=False, variant=None):
             if line.startswith("#WAVE") and len(line) > 5:
                 for c in v:
                     if c in line:
-                        line = re.sub(c+'.*?'+c, '', line)
+                        line = re.sub(re.escape(c)+'.*?'+re.escape(c), '', line)
                 line = re.sub('[^x\da-fA-F]', ' ', line[5:])
                 tokens = line.split()
                 if len(tokens) < 2: continue
@@ -144,10 +145,10 @@ def mml_to_akao(mml, fileid='mml', sfxmode=False, variant=None):
                     except:
                         warn(fileid, "#WAVE {}, {}".format(tokens[0], tokens[1]), "Couldn't parse token {}".format(t))
                         continue
-                if numbers[0] not in range(0x20,0x30):
+                if numbers[0] not in list(range(0x20,0x30)):
                     warn(fileid, "#WAVE {}, {}".format(hex(numbers[0]), hex(numbers[1])), "Program ID out of range (expected 0x20 - 0x2F / 32 - 47)")
                     continue
-                if numbers[1] not in range(0, 256):
+                if numbers[1] not in list(range(0, 256)):
                     warn(fileid, "#WAVE {}, {}".format(hex(numbers[0]), hex(numbers[1])), "Sample ID out of range (expected 0x00 - 0xFF / 0 - 255)")
                     continue
                 iset[numbers[0]] = numbers[1]
@@ -171,7 +172,20 @@ def mml_to_akao(mml, fileid='mml', sfxmode=False, variant=None):
         
 def mml_to_akao_main(mml, ignore='', fileid='mml'):
     mml = copy.copy(mml)
-    #final bit of preprocessing
+    ##final bit of preprocessing
+    #single character macros
+    cdefs = {}
+    for line in mml:
+        if line.lower().startswith("#cdef"):
+            li = line[5:]
+            li = li.split('#')[0].lower().strip()
+            li = li.split(None, 1)
+            if len(li) < 2: continue
+            if len(li[0]) != 1:
+                warn(fileid, line, "Expected one character for cdef, found {} ({})").format(len(li[0]), li[0])
+                continue
+            cdefs[li[0]] = li[1]
+    #single quote macros
     macros = {}
     for line in mml:
         if line.lower().startswith("#def"):
@@ -183,31 +197,101 @@ def mml_to_akao_main(mml, ignore='', fileid='mml'):
                 pre = pre.replace("'", "").strip()
                 for c in ignore:
                     try:
-                        post = re.sub(c+".*?"+c, "", post)
+                        post = re.sub(re.escape(c)+".*?"+re.escape(c), "", post)
                     except Exception:
                         c = "\\" + c
-                        post = re.sub(c+".*?"+c, "", post)
+                        post = re.sub(re.escape(c)+".*?"+re.escape(c), "", post)
                     post = "".join(post.split())
                 macros[pre] = post.lower()
     
-    #stillmacros = True
-    #while stillmacros:
-    #    stillmacros = False
-    #    for i, line in enumerate(mml):
-    #        for k, v in macros.items():
-    #            if "'{}'".format(k) in line:
-    #                stillmacros = True
-    #                line = line.replace("'{}'".format(k), v)
-    #        mml[i] = line
     for i, line in enumerate(mml):
         while True:
             r = re.search("'(.*?)'", line)
             if not r: break
-            m = r.group(1)
-            s = macros[m] if m in macros else ""
+            mx = r.group(1)
+            #
+            m = re.search("([^+\-*]+)", mx).group(1)
+            tweaks = {}
+            tweak_text = ""
+            while True:
+                twx = re.search("([+\-*])([%a-z]+)([0-9.,]+)", mx)
+                if not twx: break
+                tweak_text += twx.group(0)
+                cmd = twx.group(2) + ''.join([c for c in twx.group(3) if c == ','])
+                tweaks[cmd] = (twx.group(1), twx.group(3))
+                mx = mx.replace(twx.group(0), "", 1)
+            #
+            s = macros[m.lower()] if m.lower() in macros else ""
+            p = 0
+            if tweaks:
+                # "o,,": ("+", ",1,")
+                skip = ignore + "\"'{"
+                sq = list(s)
+                sr = ""
+                while sq:
+                    c = sq.pop(0)
+                    if c in skip:
+                        endat = "}" if c=="{" else c
+                        if sq: c += sq.pop(0)
+                        while sq:
+                            cc = sq.pop(0)
+                            if cc == endat:
+                                if endat == "'": c += tweak_text
+                                c += cc
+                                break
+                            else: c += cc
+                        sr += c
+                        continue
+                    if sq and c == "%":
+                        c += sq.pop(0)
+                    d = ""
+                    while sq and sq[0] in "1234567890,.+-x":
+                        d += sq.pop(0)
+                    cmd = c + ''.join([ch for ch in d if ch == ','])
+                    if d and (cmd in tweaks):
+                        d = d.split(',')
+                        e = tweaks[cmd][1].split(',')
+                        sign = tweaks[cmd][0]
+                        for j, ee in enumerate(e):
+                            if not ee:
+                                c += f"{d[j]},"
+                                continue
+                            try: en = int(ee)
+                            except:
+                                try: en = int(ee,16)
+                                except:
+                                    try: en = float(ee)
+                                    except:
+                                        warn("error parsing {} into {}".format(r.group(0), s))
+                                        en = 0
+                            try: dn = int(d[j])
+                            except:
+                                try: dn = int(d[j],16)
+                                except:
+                                    warn("error parsing {} into {}".format(r.group(0), s))      
+                                    dn = 0
+                            if sign == "*":
+                                result = dn * en
+                            elif sign == "-":
+                                result = dn - en
+                            elif sign == "+":
+                                result = dn + en
+                            if result < 0: result = 0
+                            if ((cmd == "v" or cmd == "p") and j==0) or ((cmd == "v," or cmd == "p,") and j==1):
+                                if result > 127: result = 127
+                            else:
+                                if result > 255: result = 255
+                            #apply new values
+                            c += f"{int(result)},"
+                        c = c.rstrip(',')
+                    else: c += d
+                    sr += c
+                s = sr
+                                                    
             line = line.replace(r.group(0), s, 1)
-        mml[i] = line
             
+        mml[i] = line.replace('\n', ' ')
+        
     #drums
     drums = {}
     for line in mml:
@@ -216,10 +300,10 @@ def mml_to_akao_main(mml, ignore='', fileid='mml'):
             s = s.split('#')[0].lower()
             for c in ignore:
                 try:
-                    s = re.sub(c+".*?"+c, "", s)
+                    s = re.sub(re.escape(c)+".*?"+re.escape(c), "", s)
                 except Exception:
                     c = "\\" + c
-                    s = re.sub(c+".*?"+c, "", s)
+                    s = re.sub(re.escape(c)+".*?"+re.escape(c), "", s)
             for c in ["~", "/", "`", "\?", "_"]:
                 s = re.sub(c, '', s)
             d = Drum(s.strip())
@@ -241,7 +325,11 @@ def mml_to_akao_main(mml, ignore='', fileid='mml'):
     
     while len(m):
         command = m.pop(0)
-
+        
+        #single character macros
+        if command in cdefs:
+            repl = list(cdefs[command] + " ")
+            m = repl + m
         #conditionally executed statements
         if command in ignore:
             while len(m):
@@ -331,21 +419,26 @@ def mml_to_akao_main(mml, ignore='', fileid='mml'):
                         else:
                             params[k] = v
                     s = ""
+                    if "%y" in params or "@0" in params:
+                        state.pop("%a0", None)
+                        state.pop("%y0", None)
+                        state.pop("%s0", None)
+                        state.pop("%r0", None)
                     for k, v in params.items():
                         t = (re.sub('[0-9,]', '', k) + v).strip()
                         s = t + s if k == "@0" else s + t
-                        if k == "%y" or k == "@0":
-                            state.pop("%a0", None)
-                            state.pop("%y0", None)
-                            state.pop("%s0", None)
-                            state.pop("%r0", None)
-                        if k != "%y": state[k] = v
+                        if k != "%y":
+                            state[k] = v
+                        
                     if 'o0' in state:
                         if isinstance(state['o0'], str): state['o0'] = int(state['o0'])
                         ochg = drumset[dcom].octave - int(state['o0'])
-                        if ochg < 0:
-                            s += ">" * abs(ochg)
-                        else: s += "<" * ochg
+                        if abs(ochg) <= 1:
+                            if ochg < 0:
+                                s += ">" * abs(ochg)
+                            else: s += "<" * ochg
+                        else:
+                            s += "o{}".format(drumset[dcom].octave)
                         state['o0'] += ochg
                     else:
                         s += "o{}".format(drumset[dcom].octave)
@@ -538,7 +631,7 @@ def mml_to_akao_main(mml, ignore='', fileid='mml'):
     header = int_insert("\x00"*0x26, 0, len(data)-2, 2)
     header = int_insert(header, 2, 0x26, 2)
     header = int_insert(header, 4, len(data), 2)
-    for i in xrange(0,8):
+    for i in range(0,8):
         if i not in channels:
             channels[i] = len(data)
     for k, v in channels.items():
@@ -550,27 +643,27 @@ def mml_to_akao_main(mml, ignore='', fileid='mml'):
     return data
     
 def clean_end():
-    print "Processing ended."
-    raw_input("Press enter to close.")
+    print("Processing ended.")
+    input("Press enter to close.")
     quit()
     
 if __name__ == "__main__":
     mml_log = "\n"
 
-    print "mfvitools MML to AKAO SNESv4 converter"
-    print
+    print("mfvitools MML to AKAO SNESv4 converter")
+    print()
     
     if len(sys.argv) >= 2:
         fn = sys.argv[1]
     else:
-        print "Enter MML filename.."
-        fn = raw_input(" > ").replace('"','').strip()
+        print("Enter MML filename..")
+        fn = input(" > ").replace('"','').strip()
     
     try:
         with open(fn, 'r') as f:
             mml = f.readlines()
     except IOError:
-        print "Error reading file {}".format(fn)
+        print("Error reading file {}".format(fn))
         clean_end()
 
     try:
@@ -586,29 +679,29 @@ if __name__ == "__main__":
         thisfn = fn + "_data" + vfn
         try:
             with open(thisfn, 'wb') as f:
-                f.write(v[0])
+                f.write(bytes(v[0], encoding='latin-1'))
         except IOError:
-            print "Error writing file {}".format(thisfn)
+            print("Error writing file {}".format(thisfn))
             clean_end()
-        print "Wrote {} - {} bytes".format(thisfn, hex(len(v[0])))
+        print("Wrote {} - {} bytes".format(thisfn, hex(len(v[0]))))
         
         thisfn = fn + "_inst" + vfn
         try:
             with open(thisfn, 'wb') as f:
-                f.write(v[1])
+                f.write(bytes(v[1], encoding='latin-1'))
         except IOError:
-            print "Error writing file {}".format(thisfn)
+            print("Error writing file {}".format(thisfn))
             clean_end()
-        print "Wrote {}".format(thisfn)
+        print("Wrote {}".format(thisfn))
         
     try:
         with open(os.path.join(os.path.split(sys.argv[0])[0],"mml_log.txt"), 'w') as f:
             f.write(mml_log)
     except IOError:
-        print "Couldn't write log file, displaying..."
-        print mml_log
+        print("Couldn't write log file, displaying...")
+        print(mml_log)
             
-    print "Conversion successful."
-    print
+    print("Conversion successful.")
+    print()
     
     clean_end()
